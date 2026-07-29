@@ -81,7 +81,7 @@ IT               DRAIN      0          0.5        6          6          0       
 [LID_USAGE]
 ;;Subcatchment   LID Process      Number  Area       Width      InitSat    FromImp    ToPerv     RptFile                  DrainTo          FromPerv  
 ;;-------------- ---------------- ------- ---------- ---------- ---------- ---------- ---------- ------------------------ ---------------- ----------
-wIT              IT               100     1090       10         0          100        1          "C:\Users\dickinre\Desktop\bob.txt" *                100             
+wIT              IT               100     1090       10         0          100        1          "bob.txt"                   *                100             
 
 [JUNCTIONS]
 ;;Name           Elevation  MaxDepth   InitDepth  SurDepth   Aponded   
