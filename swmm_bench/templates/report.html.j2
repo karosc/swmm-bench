@@ -1,0 +1,1734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>swmm-bench report - {{ result.name }}</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --surface-muted: #f8fafc;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #dbe2ea;
+      --green: #d1fae5;
+      --yellow: #fef3c7;
+      --red: #fee2e2;
+      --green-text: #065f46;
+      --yellow-text: #92400e;
+      --red-text: #991b1b;
+      --failed: #ede9fe;
+      --failed-text: #5b21b6;
+      --accent: #2563eb;
+      --engine-a: #2563eb;
+      --engine-b: #c2410c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    button, input, select { font: inherit; }
+    .container {
+      max-width: 1800px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+    }
+    h1, h2, h3 { margin-top: 0; }
+    .meta-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .meta-item {
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fafcff;
+    }
+    .meta-label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .table-scroll { overflow: auto; }
+    .issue-queue { max-height: min(60vh, 560px); }
+    .issue-queue th { position: sticky; top: 0; z-index: 1; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+    th, td {
+      border-bottom: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: var(--surface-muted);
+      font-weight: 600;
+    }
+    .distance-green { background: var(--green); color: var(--green-text); }
+    .distance-yellow { background: var(--yellow); color: var(--yellow-text); }
+    .distance-red { background: var(--red); color: var(--red-text); }
+    .distance-failed { background: var(--failed); color: var(--failed-text); }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .warning-badge { background: var(--yellow); color: var(--yellow-text); }
+    .explorer-item[data-has-warnings="true"] {
+      border-color: #f59e0b;
+      background: #fffaf0;
+    }
+    details {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-top: 12px;
+      background: #fcfdff;
+    }
+    summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    .metric-help {
+      margin-top: 14px;
+      background: var(--surface-muted);
+    }
+    .metric-help summary { color: var(--text); }
+    .metric-help-body { margin-top: 10px; }
+    .metric-help-body p { margin: 6px 0; }
+    .metric-formula {
+      display: block;
+      margin: 8px 0;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      overflow-wrap: anywhere;
+    }
+    .info-icon { color: var(--accent); margin-right: 4px; }
+    .muted { color: var(--muted); }
+    .nowrap { white-space: nowrap; }
+    .jump-link {
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .section-nav {
+      position: sticky;
+      top: 12px;
+      z-index: 2;
+      display: flex;
+      gap: 8px;
+      margin: -8px 0 20px;
+      padding: 8px;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(248, 250, 252, 0.96);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+    }
+    .section-nav a {
+      flex: 0 0 auto;
+      border: 1px solid transparent;
+      border-radius: 7px;
+      padding: 6px 9px;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .section-nav a:hover {
+      border-color: var(--border);
+      color: var(--accent);
+      background: var(--card);
+    }
+    .section-nav .count {
+      margin-left: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .card[id] { scroll-margin-top: 72px; }
+    .summary-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .summary-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      margin-top: 12px;
+    }
+    .summary-stat strong {
+      display: block;
+      font-size: 28px;
+      line-height: 1.2;
+    }
+    .priority-heading { margin: 18px 0 4px; }
+    .priority-table td:last-child { white-space: nowrap; }
+    .issue-controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 8px;
+      margin: 12px 0 8px;
+    }
+    .issue-controls label,
+    .issue-filter {
+      min-width: 0;
+    }
+    .issue-controls label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .issue-filter {
+      width: 100%;
+      margin-top: 4px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: var(--card);
+      color: var(--text);
+      font: inherit;
+    }
+    .issue-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 8px 0;
+    }
+    .issue-chip,
+    .issue-group-toggle {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 9px;
+      background: var(--card);
+      color: var(--text);
+      cursor: pointer;
+      font: inherit;
+    }
+    .issue-chip[aria-pressed="true"],
+    .issue-group-toggle:hover {
+      border-color: var(--accent);
+      background: #eff6ff;
+      color: var(--accent);
+    }
+    .issue-group-row th,
+    .issue-group-row td {
+      background: var(--surface-muted);
+      font-weight: 600;
+    }
+    [data-issue-group][data-collapsed="true"] .issue-row { display: none; }
+    .issue-row td:first-child { color: var(--muted); }
+    .issue-evidence summary { cursor: pointer; }
+    .issue-evidence ul { margin: 8px 0 0; padding-left: 18px; }
+    .issue-summary { margin: 12px 0; }
+    .issue-summary-filter {
+      width: 100%;
+      cursor: pointer;
+      color: var(--text);
+      font: inherit;
+      text-align: left;
+    }
+    .issue-summary-filter:hover,
+    .issue-summary-filter[aria-pressed="true"] {
+      border-color: var(--accent);
+      background: #eff6ff;
+    }
+    .issue-toolbar {
+      position: sticky;
+      top: 72px;
+      z-index: 1;
+      margin: 12px 0;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(248, 250, 252, 0.96);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+    }
+    .issue-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .issue-action {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 9px;
+      background: var(--card);
+      color: var(--text);
+      cursor: pointer;
+      font: inherit;
+    }
+    .issue-action:hover { border-color: var(--accent); color: var(--accent); }
+    .compact-details {
+      margin-top: 0;
+      background: var(--card);
+    }
+    .compact-details > summary { color: var(--text); }
+    .sort-button {
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 600;
+      text-align: left;
+    }
+    .sort-button:hover { color: var(--accent); }
+    .drilldown-summary {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px 10px;
+    }
+    .summary-meta {
+      color: var(--muted);
+      font-weight: 400;
+    }
+    .comparison-explorer {
+      display: grid;
+      grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+      gap: 16px;
+      margin-top: 12px;
+      align-items: stretch;
+      height: calc(100vh - 220px);
+      min-height: 520px;
+    }
+    .explorer-sidebar {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-muted);
+      padding: 12px;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .explorer-controls {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .explorer-controls label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .explorer-filter {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: var(--card);
+      color: var(--text);
+    }
+    .explorer-list {
+      display: grid;
+      gap: 8px;
+      align-content: start;
+      flex: 1 1 auto;
+      margin: 0;
+      padding: 0;
+      overflow-y: auto;
+      list-style: none;
+      min-height: 0;
+    }
+    .explorer-detail {
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+    }
+    .explorer-item {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      background: var(--card);
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+    }
+    .explorer-item:hover { border-color: var(--accent); }
+    .explorer-item[aria-pressed="true"] {
+      border-color: var(--accent);
+      box-shadow: inset 3px 0 0 var(--accent);
+      background: #f8fbff;
+    }
+    .explorer-item-title,
+    .explorer-item-meta {
+      display: block;
+      overflow-wrap: anywhere;
+    }
+    .explorer-item-title { font-weight: 600; }
+    .explorer-item-meta { color: var(--muted); font-size: 13px; }
+    .explorer-panel {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fcfdff;
+      padding: 14px 16px;
+      min-width: 0;
+      flex: 1 1 auto;
+      overflow: auto;
+    }
+    .explorer-panel h3 { margin-bottom: 4px; }
+    .explorer-panel > .table-scroll,
+    .explorer-panel .tab-panel > .table-scroll {
+      max-height: calc(100vh - 320px);
+      overscroll-behavior: contain;
+    }
+    .explorer-panel .table-scroll th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    canvas { max-height: 360px; }
+    [hidden] { display: none !important; }
+    .series-button:focus-visible,
+    .explorer-item:focus-visible,
+    .graph-filter:focus-visible,
+    .explorer-filter:focus-visible,
+    .issue-filter:focus-visible,
+    .issue-chip:focus-visible,
+    .issue-summary-filter:focus-visible,
+    .issue-action:focus-visible,
+    .issue-group-toggle:focus-visible,
+    .chart-reset:focus-visible,
+    .section-nav a:focus-visible,
+    .jump-link:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .graph-layout {
+      display: grid;
+      grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+      gap: 20px;
+      min-height: 440px;
+    }
+    .graph-sidebar {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-muted);
+      padding: 12px;
+      min-width: 0;
+    }
+    .graph-controls {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .graph-control label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .graph-filter {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: var(--card);
+      color: var(--text);
+    }
+    .series-list {
+      display: grid;
+      gap: 8px;
+      max-height: 530px;
+      margin: 0;
+      padding: 0;
+      overflow-y: auto;
+      list-style: none;
+    }
+    .series-button {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      background: var(--card);
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+    }
+    .series-button:hover { border-color: var(--accent); }
+    .series-button[aria-pressed="true"] {
+      border-color: var(--accent);
+      box-shadow: inset 3px 0 0 var(--accent);
+      background: #f8fbff;
+    }
+    .series-item-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .series-type {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .series-name,
+    .series-attribute {
+      display: block;
+      overflow-wrap: anywhere;
+    }
+    .series-name { font-weight: 600; }
+    .series-attribute { color: var(--muted); font-size: 13px; }
+    .graph-content { min-width: 0; }
+    .graph-heading-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+    .graph-heading-row h3 { margin-bottom: 4px; }
+    .graph-score-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(150px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .graph-score {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: var(--surface-muted);
+    }
+    .graph-score strong { display: block; font-size: 18px; }
+    .chart-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .chart-help { margin: 0; font-size: 13px; }
+    .chart-reset {
+      flex: 0 0 auto;
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      padding: 7px 11px;
+      background: var(--card);
+      color: var(--accent);
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .chart-reset:hover:not(:disabled) { background: #eff6ff; }
+    .chart-reset:disabled {
+      border-color: var(--border);
+      color: var(--muted);
+      cursor: not-allowed;
+    }
+    .chart-frame {
+      position: relative;
+      min-height: 360px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      background: var(--card);
+    }
+    .chart-frame canvas {
+      width: 100% !important;
+      height: 340px !important;
+    }
+    .graph-empty {
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      padding: 24px;
+      color: var(--muted);
+      text-align: center;
+    }
+    @media (max-width: 800px) {
+      .container { padding: 12px; }
+      .card { padding: 14px; }
+      .graph-layout { grid-template-columns: 1fr; }
+      .comparison-explorer { grid-template-columns: 1fr; height: auto; }
+      .series-list { max-height: 280px; }
+      .graph-score-grid { grid-template-columns: 1fr; }
+      .graph-heading-row { display: block; }
+      .chart-toolbar { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+{% macro render_section_table(comparison, item_label) %}
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>{{ item_label }}</th>
+          <th>Distance</th>
+          <th>Rows {{ comparison.engine_a }}</th>
+          <th>Rows {{ comparison.engine_b }}</th>
+          <th>Top differences</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for section in comparison.section_comparisons %}
+        {% set section_class = section.distance | distance_class %}
+        <tr class="distance-{{ section_class }}">
+          <td>{{ section.section_name }}{% if section.note %} <span class="pill warning-badge">missing table</span>{% endif %}</td>
+          <td>{{ '%.6f'|format(section.distance) }}</td>
+          <td>{{ section.row_count_a }}</td>
+          <td>{{ section.row_count_b }}</td>
+          <td>
+            {% if section.difference_count %}
+              <div class="muted">{{ section.difference_count }} differing cells{% if section.differences_truncated %}; retained details are capped at {{ section.differences|length }}, with the first {{ 10 if section.differences|length > 10 else section.differences|length }} shown below{% endif %}.</div>
+            {% endif %}
+            {% if section.differences %}
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Row</th>
+                      <th>Column</th>
+                      <th>{{ comparison.engine_a }}</th>
+                      <th>{{ comparison.engine_b }}</th>
+                      <th>Abs diff</th>
+                      <th>Rel diff</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for diff in section.differences[:10] %}
+                    <tr>
+                      <td>{{ diff.row }}</td>
+                      <td>{{ diff.column }}</td>
+                      <td>{{ diff.value_a }}</td>
+                      <td>{{ diff.value_b }}</td>
+                      <td>{{ diff.abs_diff }}</td>
+                      <td>{{ diff.rel_diff }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% elif section.note %}
+              <span class="muted">{{ section.note }}</span>
+            {% else %}
+              <span class="muted">No notable differences.</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endmacro %}
+{% macro render_comparisons(title, rows, empty_message, item_label) %}
+  <section class="card"{% if title == "Report" %} id="report-comparison-explorer"{% endif %}>
+    <h2>{{ title }} comparison explorer</h2>
+    {% if rows %}
+    <div class="comparison-explorer" data-comparison-explorer>
+      <aside class="explorer-sidebar" aria-label="{{ title }} comparisons">
+        <div class="explorer-controls">
+          <label>Search model or engine
+            <input class="explorer-filter" type="search" placeholder="Filter comparisons" data-explorer-search>
+          </label>
+          <label>Severity
+            <select class="explorer-filter" data-explorer-severity>
+              <option value="">All severities</option>
+              <option value="red">Red</option>
+              <option value="yellow">Yellow</option>
+              <option value="green">Green</option>
+              <option value="failed">Failed</option>
+            </select>
+          </label>
+          <label>Engine pair
+            <select class="explorer-filter" data-explorer-engine-pair>
+              <option value="">All engine pairs</option>
+            </select>
+          </label>
+          <label>Minimum distance
+            <input class="explorer-filter" type="number" min="0" step="any" placeholder="No minimum" data-explorer-min-distance>
+          </label>
+          <label>Maximum distance
+            <input class="explorer-filter" type="number" min="0" step="any" placeholder="No maximum" data-explorer-max-distance>
+          </label>
+        </div>
+        <p class="muted" data-explorer-status></p>
+        <ul class="explorer-list" aria-label="{{ title }} comparison list">
+          {% for item in rows %}
+          {% set comparison = item.comparison %}
+          {% set klass = item.severity %}
+          {% set panel_id = item.dom_id %}
+          <li>
+            <button class="explorer-item" type="button" data-explorer-item data-panel-id="{{ panel_id }}" data-search="{{ comparison.inp_name }} {{ comparison.engine_a }} {{ comparison.engine_b }}" data-severity="{{ klass }}" data-engine-pair="{{ comparison.engine_a }} vs {{ comparison.engine_b }}" data-distance="{{ comparison.overall_distance }}" data-has-warnings="{{ 'true' if comparison.report_warnings or comparison.report_errors else 'false' }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">
+              <span class="series-item-top"><span class="series-type">{{ klass }}</span><span class="pill distance-{{ klass }}">{{ '%.6f'|format(comparison.overall_distance) }}</span></span>
+              <span class="explorer-item-title">{{ comparison.inp_name }}</span>
+              <span class="explorer-item-meta">{{ comparison.engine_a }} vs {{ comparison.engine_b }}{% if item.placeholder_reason %} · placeholder{% elif comparison.report_warnings %} · {{ comparison.report_warnings|length }} table warning{{ "s" if comparison.report_warnings|length != 1 else "" }}{% endif %}</span>
+            </button>
+          </li>
+          {% endfor %}
+        </ul>
+      </aside>
+      <div class="explorer-detail">
+        {% for item in rows %}
+        {% set comparison = item.comparison %}
+        {% set klass = item.severity %}
+        {% set panel_id = item.dom_id %}
+        <section class="explorer-panel" data-explorer-panel="{{ panel_id }}" {% if not loop.first %}hidden{% endif %}>
+          <h3>{{ comparison.inp_name }}</h3>
+          <p class="muted">{{ comparison.engine_a }} vs {{ comparison.engine_b }} · overall distance <span class="pill distance-{{ klass }}">{{ '%.6f'|format(comparison.overall_distance) }}</span>{% if item.placeholder_reason %} <span class="pill distance-{{ klass }}">{{ "failed" if klass == "failed" else "placeholder" }}</span>{% elif comparison.report_errors %} <span class="pill distance-failed">{{ comparison.report_errors|length }} error{{ "s" if comparison.report_errors|length != 1 else "" }}</span>{% elif comparison.report_warnings %} <span class="pill warning-badge">{{ comparison.report_warnings|length }} warning{{ "s" if comparison.report_warnings|length != 1 else "" }}</span>{% endif %}</p>
+          {% if item.placeholder_reason %}
+          <div class="graph-empty{% if klass == 'failed' %} distance-failed{% endif %}">{{ item.placeholder_reason }}</div>
+          {% endif %}
+          {% if item.diagnostic_rows %}
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>{{ comparison.engine_a }}</th>
+                  <th>{{ comparison.engine_b }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in item.diagnostic_rows %}
+                <tr class="distance-{{ 'failed' if row.kind == 'Error' else 'yellow' }}">
+                  <td>{{ row.message_a or "" }}</td>
+                  <td>{{ row.message_b or "" }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% endif %}
+          {% if not item.placeholder_reason %}
+            {{ render_section_table(comparison, item_label) }}
+          {% endif %}
+        </section>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <p class="muted">{{ empty_message }}</p>
+    {% endif %}
+  </section>
+{% endmacro %}
+{% macro render_output_comparisons(title, drilldowns, empty_message) %}
+  <section class="card"{% if title == "Output" %} id="output-comparison-explorer"{% endif %}>
+    <h2>{{ title }} comparison explorer</h2>
+    {% if drilldowns %}
+    <div class="comparison-explorer" data-comparison-explorer>
+      <aside class="explorer-sidebar" aria-label="{{ title }} comparisons">
+        <div class="explorer-controls">
+          <label>Search model or engine
+            <input class="explorer-filter" type="search" placeholder="Filter comparisons" data-explorer-search>
+          </label>
+          <label>Severity
+            <select class="explorer-filter" data-explorer-severity>
+              <option value="">All severities</option>
+              <option value="red">Red</option>
+              <option value="yellow">Yellow</option>
+              <option value="green">Green</option>
+              <option value="failed">Failed</option>
+            </select>
+          </label>
+          <label>Engine pair
+            <select class="explorer-filter" data-explorer-engine-pair>
+              <option value="">All engine pairs</option>
+            </select>
+          </label>
+          <label>Minimum distance
+            <input class="explorer-filter" type="number" min="0" step="any" placeholder="No minimum" data-explorer-min-distance>
+          </label>
+          <label>Maximum distance
+            <input class="explorer-filter" type="number" min="0" step="any" placeholder="No maximum" data-explorer-max-distance>
+          </label>
+        </div>
+        <p class="muted" data-explorer-status></p>
+        <ul class="explorer-list" aria-label="{{ title }} comparison list">
+          {% for item in drilldowns %}
+          {% set comparison = item.comparison %}
+          {% set klass = item.severity %}
+          <li>
+            <button class="explorer-item" type="button" data-explorer-item data-panel-id="{{ item.dom_id }}" data-search="{{ comparison.inp_name }} {{ comparison.engine_a }} {{ comparison.engine_b }} {{ item.metric_info.short_label }}" data-severity="{{ klass }}" data-engine-pair="{{ comparison.engine_a }} vs {{ comparison.engine_b }}" data-distance="{{ comparison.overall_distance }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">
+              <span class="series-item-top"><span class="series-type">{{ klass }}</span><span class="pill distance-{{ klass }}">{{ '%.6f'|format(comparison.overall_distance) }}</span></span>
+              <span class="explorer-item-title">{{ comparison.inp_name }}</span>
+              <span class="explorer-item-meta">{{ comparison.engine_a }} vs {{ comparison.engine_b }} · {{ item.metric_info.short_label }}{% if item.placeholder_reason %} · placeholder{% elif item.graphical_series %} · {{ item.graphical_series|length }} graph series{% else %} · graph unavailable{% endif %}</span>
+            </button>
+          </li>
+          {% endfor %}
+        </ul>
+      </aside>
+      <div class="explorer-detail">
+        {% for item in drilldowns %}
+        {% set comparison = item.comparison %}
+        {% set klass = item.severity %}
+        <section class="explorer-panel" data-explorer-panel="{{ item.dom_id }}" {% if not loop.first %}hidden{% endif %}>
+          <div class="output-comparison" data-output-comparison data-engine-a="{{ comparison.engine_a }}" data-engine-b="{{ comparison.engine_b }}">
+            <h3>{{ comparison.inp_name }}</h3>
+            <p class="muted">{{ comparison.engine_a }} vs {{ comparison.engine_b }} · {{ item.metric_info.short_label }} · overall distance <span class="pill distance-{{ klass }}">{{ '%.6f'|format(comparison.overall_distance) }}</span>{% if item.placeholder_reason %} <span class="pill distance-{{ klass }}">{{ "failed" if klass == "failed" else "placeholder" }}</span>{% elif not item.details_retained %} <span class="pill distance-{{ klass }}">summary only</span>{% elif item.graphical_series %} · graphical view loads on click{% endif %}</p>
+            {% if item.placeholder_reason or not item.details_retained %}
+            <div class="graph-empty">{{ item.placeholder_reason or "Detailed output comparison data was not retained." }}</div>
+            {% else %}
+            <details class="metric-help">
+              <summary><span class="info-icon" aria-hidden="true">ⓘ</span> About output distance — {{ item.metric_info.label }}</summary>
+              <div class="metric-help-body">
+                {% if item.metric_info.kind == "nrmse" %}
+                  <p>Finite paired timestamps use a symmetric RMS-normalized root mean square error.</p>
+                  <code class="metric-formula">numeric distance = min(RMSE(A − B) / max(RMS(A), RMS(B)), 1)</code>
+                  <p>One-sided timestamps, one-sided null or invalid values, and semantic series absent from one engine count as missing. Paired null values are neutral.</p>
+                  <code class="metric-formula">series distance = missing fraction + (1 − missing fraction) × numeric distance</code>
+                  <p>The overall output distance is the equal-weight arithmetic mean of all semantic-series distances. Scores at or below 1% are green, scores at or below 10% are yellow, and larger scores are red.</p>
+                  <p>Report-table comparisons use a separate cell-weighted relative-distance metric.</p>
+                {% elif item.metric_info.kind == "legacy" %}
+                  <p>This saved result uses the legacy output metric: the mean of pointwise absolute differences normalized by the larger magnitude at each timestamp and capped at one.</p>
+                  <code class="metric-formula">point distance = min(|A − B| / max(|A|, |B|), 1)</code>
+                  <p>Near-zero values can therefore produce large relative scores. The bounded graph samples in this result are not sufficient to reconstruct the newer NRMSE metric.</p>
+                {% else %}
+                  <p>Documentation is unavailable for persisted output metric <code>{{ item.metric_info.id }}</code>. The displayed values are preserved as recorded.</p>
+                {% endif %}
+              </div>
+            </details>
+            {% if item.graphical_series %}
+              <div class="graph-empty" data-graph-error hidden>Graphical data could not be displayed.</div>
+              {% if item.graphical_note %}<p class="muted">{{ item.graphical_note }}</p>{% endif %}
+              <div class="graph-layout" data-graph-layout>
+                <aside class="graph-sidebar" aria-label="Output series selector">
+                  <div class="graph-controls">
+                    <div class="graph-control">
+                      <label for="{{ item.dom_id }}-type-filter">Element type</label>
+                      <select class="graph-filter" id="{{ item.dom_id }}-type-filter" data-type-filter>
+                        <option value="">All element types</option>
+                      </select>
+                    </div>
+                    <div class="graph-control">
+                      <label for="{{ item.dom_id }}-search">Search element or attribute</label>
+                      <input class="graph-filter" id="{{ item.dom_id }}-search" type="search" placeholder="Filter series" data-series-search>
+                    </div>
+                  </div>
+                  <p class="muted" data-filter-status></p>
+                  <ul class="series-list" data-series-list aria-label="Available output series"></ul>
+                </aside>
+                <div class="graph-content">
+                  <div class="graph-heading-row">
+                    <div>
+                      <h3 data-series-title>Select an output series</h3>
+                      <p class="muted" data-series-subtitle></p>
+                    </div>
+                  </div>
+                  <div class="graph-score-grid">
+                    <div class="graph-score">
+                      <span class="meta-label">Overall output distance — {{ item.metric_info.short_label }}</span>
+                      <strong>{{ '%.6f'|format(comparison.overall_distance) }}</strong>
+                    </div>
+                    <div class="graph-score">
+                      <span class="meta-label">Selected series distance — {{ item.metric_info.short_label }}</span>
+                      <strong data-series-distance>—</strong>
+                    </div>
+                  </div>
+                  <div class="chart-toolbar">
+                    <p class="muted chart-help" data-zoom-help>Ctrl + wheel or pinch to zoom time. Shift + drag selects a time window; Alt + drag pans.</p>
+                    <button class="chart-reset" type="button" data-reset-zoom disabled>Reset zoom</button>
+                  </div>
+                  <div class="chart-frame" data-chart-frame>
+                    <canvas data-output-chart role="img" aria-describedby="{{ item.dom_id }}-chart-status {{ item.dom_id }}-sample-table">Time-series comparison chart for {{ comparison.engine_a }} and {{ comparison.engine_b }}.</canvas>
+                  </div>
+                  <p class="muted" id="{{ item.dom_id }}-chart-status" data-chart-status aria-live="polite"></p>
+                  <details id="{{ item.dom_id }}-sample-table" data-sample-table>
+                    <summary>View plotted samples as a table</summary>
+                    <div class="table-scroll">
+                      <table>
+                        <caption class="muted">The timestamp and paired values used in the selected graph.</caption>
+                        <thead>
+                          <tr>
+                            <th>Timestamp</th>
+                            <th>{{ comparison.engine_a }}</th>
+                            <th>{{ comparison.engine_b }}</th>
+                          </tr>
+                        </thead>
+                        <tbody data-sample-table-body></tbody>
+                      </table>
+                    </div>
+                  </details>
+                </div>
+              </div>
+              <script type="application/json" id="{{ item.dom_id }}-data" data-output-series-data>{{ item.graphical_series | tojson }}</script>
+            {% else %}
+              <div class="graph-empty">{{ item.graphical_unavailable_reason or "Graphical data was not retained for this result." }}</div>
+            {% endif %}
+            {% endif %}
+          </div>
+        </section>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <p class="muted">{{ empty_message }}</p>
+    {% endif %}
+  </section>
+{% endmacro %}
+<body>
+  <div class="container">
+    <section class="card">
+      <h1>{{ "swmm-test interface report" if interface_groups else "swmm-bench report" }}</h1>
+      <p class="muted">{{ "Interface run" if interface_groups else "Benchmark" }} <strong>{{ result.name }}</strong> captured at {{ result.timestamp }}</p>
+      <div class="meta-grid">
+        <div class="meta-item"><span class="meta-label">Host</span>{{ result.platform.host }}</div>
+        <div class="meta-item"><span class="meta-label">Operating system</span>{{ result.platform.os }}</div>
+        <div class="meta-item"><span class="meta-label">Python</span>{{ result.platform.python }}</div>
+        <div class="meta-item"><span class="meta-label">Schema version</span>{{ result.schema_version }}</div>
+      </div>
+    </section>
+
+    {% if not interface_groups %}
+    <nav class="section-nav" aria-label="Report sections">
+      <a href="#overview">Overview</a>
+      <a href="#performance">Performance</a>
+      <a href="#report-comparison-explorer">Report <span class="count">{{ comparison_rows|length }}</span></a>
+      <a href="#output-comparison-explorer">Output <span class="count">{{ output_drilldowns|length }}</span></a>
+    </nav>
+    {% endif %}
+
+    <section class="card" id="overview" aria-labelledby="disagreement-overview">
+      <div class="summary-head">
+        <div>
+          <h2 id="disagreement-overview">Disagreement overview</h2>
+          <p class="muted">Every comparison pair is searchable below. Pairs below {{ '%.0f'|format(comparison_exclusion_threshold * 100) }}% or without completed engine output show a placeholder instead of graphical data. Graph JSON is parsed only after opening a comparison.</p>
+        </div>
+      </div>
+      <div class="summary-grid">
+        <div class="meta-item summary-stat"><span class="meta-label">Output pairs to inspect</span><strong>{{ output_drilldowns|length }}</strong><span class="muted">{{ excluded_output_comparison_count }} placeholders</span></div>
+        <div class="meta-item summary-stat"><span class="meta-label">Report-table pairs to inspect</span><strong>{{ comparison_rows|length }}</strong><span class="muted">{{ excluded_report_comparison_count }} placeholders</span></div>
+        <div class="meta-item summary-stat"><span class="meta-label">Report diagnostics</span><strong>{{ report_error_count }} errors</strong><span class="muted">{{ report_warning_count }} warnings</span></div>
+        <div class="meta-item summary-stat"><span class="meta-label">Run size</span><strong>{{ engines|length }} × {{ models|length }}</strong><span class="muted">engines by models</span></div>
+      </div>
+      {% if issue_groups %}
+      <h3 class="priority-heading">Issue queue</h3>
+      <p class="muted">Ranked report and output disagreements. Expand a model for evidence, then open the existing detail view.</p>
+      <div data-issue-queue-container>
+        <div class="summary-grid issue-summary" aria-label="Issue queue filters">
+          <button class="meta-item summary-stat issue-summary-filter" type="button" data-issue-chip="" aria-pressed="true"><span class="meta-label">All issues</span><strong>{{ issue_counts.total }}</strong><span class="muted">Show every issue</span></button>
+          <button class="meta-item summary-stat issue-summary-filter" type="button" data-issue-chip="failed" aria-pressed="false"><span class="meta-label">Failed issues</span><strong>{{ issue_counts.failed }}</strong><span class="muted">Requires investigation</span></button>
+          <button class="meta-item summary-stat issue-summary-filter" type="button" data-issue-chip="red" aria-pressed="false"><span class="meta-label">Red issues</span><strong>{{ issue_counts.red }}</strong><span class="muted">Large disagreement</span></button>
+          <button class="meta-item summary-stat issue-summary-filter" type="button" data-issue-chip="yellow" aria-pressed="false"><span class="meta-label">Yellow issues</span><strong>{{ issue_counts.yellow }}</strong><span class="muted">Moderate disagreement</span></button>
+        </div>
+        <div class="issue-toolbar">
+          <div class="issue-controls">
+            <label>Search model or engine
+              <input class="issue-filter" type="search" placeholder="Filter issues" data-issue-search>
+            </label>
+            <label>Kind
+              <select class="issue-filter" data-issue-kind>
+                <option value="">All kinds</option>
+                <option value="Report">Report</option>
+                <option value="Output">Output</option>
+              </select>
+            </label>
+            <label>Severity
+              <select class="issue-filter" data-issue-severity>
+                <option value="">All severities</option>
+                <option value="failed">Failed</option>
+                <option value="red">Red</option>
+                <option value="yellow">Yellow</option>
+              </select>
+            </label>
+            <label>Engine pair
+              <select class="issue-filter" data-issue-engine-pair>
+                <option value="">All engine pairs</option>
+              </select>
+            </label>
+            <label>Minimum distance
+              <input class="issue-filter" type="number" min="0" step="any" placeholder="No minimum" data-issue-min-distance>
+            </label>
+            <label>Maximum distance
+              <input class="issue-filter" type="number" min="0" step="any" placeholder="No maximum" data-issue-max-distance>
+            </label>
+          </div>
+          <div class="issue-chips" aria-label="Issue severity filters">
+            <button class="issue-chip" type="button" data-issue-chip="" aria-pressed="true">All {{ issue_counts.total }}</button>
+            <button class="issue-chip" type="button" data-issue-chip="failed" aria-pressed="false">Failed {{ issue_counts.failed }}</button>
+            <button class="issue-chip" type="button" data-issue-chip="red" aria-pressed="false">Red {{ issue_counts.red }}</button>
+            <button class="issue-chip" type="button" data-issue-chip="yellow" aria-pressed="false">Yellow {{ issue_counts.yellow }}</button>
+          </div>
+          <div class="issue-actions">
+            <p class="muted" data-issue-status></p>
+            <div>
+              <button class="issue-action" type="button" data-issue-collapse-all>Collapse all</button>
+              <button class="issue-action" type="button" data-issue-expand-filtered>Expand filtered</button>
+            </div>
+          </div>
+        </div>
+        <div class="table-scroll issue-queue">
+          <table class="priority-table" data-issue-queue>
+            <thead>
+              <tr>
+                <th><button class="sort-button" type="button" data-issue-sort="model">Model</button></th>
+                <th><button class="sort-button" type="button" data-issue-sort="kind">Kind</button></th>
+                <th><button class="sort-button" type="button" data-issue-sort="engine">Engines</button></th>
+                <th><button class="sort-button" type="button" data-issue-sort="distance">Distance</button></th>
+                <th><button class="sort-button" type="button" data-issue-sort="diagnostics">Diagnostics</button></th>
+                <th>Evidence</th>
+                <th>Next</th>
+              </tr>
+            </thead>
+            {% for group in issue_groups %}
+            <tbody data-issue-group data-issue-model="{{ group.model }}" data-issue-kind="{{ group.kinds|join(' ') }}" data-issue-engine-pair="{{ group.engine_pair }}" data-issue-distance="{{ group.distance }}" data-issue-diagnostics="{{ group.diagnostics }}">
+              <tr class="issue-group-row distance-{{ group.severity }}">
+                <th><button class="issue-group-toggle" type="button" data-issue-toggle aria-expanded="true">{{ group.model }}</button></th>
+                <td>{{ group.issues|length }} issue{{ "s" if group.issues|length != 1 else "" }}</td>
+                <td>{{ group.engine_pair }}</td>
+                <td>{{ '%.6f'|format(group.distance) }}</td>
+                <td>{{ group.diagnostics }}</td>
+                <td><span class="muted">—</span></td>
+                <td><button class="issue-group-toggle" type="button" data-issue-toggle data-issue-collapse-label aria-expanded="true">Collapse</button></td>
+              </tr>
+              {% for item in group.issues %}
+              {% set comparison = item.comparison %}
+              <tr class="issue-row distance-{{ item.severity }}" data-issue-row data-issue-kind="{{ item.kind }}" data-issue-severity="{{ item.severity }}" data-issue-search="{{ comparison.inp_name }} {{ item.engine_pair }}" data-issue-engine-pair="{{ item.engine_pair }}" data-issue-distance="{{ comparison.overall_distance }}">
+                <td>{{ comparison.inp_name }}</td>
+                <td>{{ item.kind }}</td>
+                <td>{{ item.engine_pair }}</td>
+                <td>{{ '%.6f'|format(comparison.overall_distance) }}</td>
+                <td>{% if item.diagnostics is not none %}{{ item.diagnostics }}{% else %}<span class="muted">—</span>{% endif %}</td>
+                <td>
+                  <details class="issue-evidence">
+                    <summary>Preview</summary>
+                    {% if item.kind == "Report" %}
+                      {% if item.diagnostic_rows %}
+                      <ul>
+                        {% for row in item.diagnostic_rows[:3] %}
+                        <li><strong>{{ row.kind }}</strong>: {{ row.message_a or "—" }}{% if row.message_b %} / {{ row.message_b }}{% endif %}</li>
+                        {% endfor %}
+                      </ul>
+                      {% else %}
+                      <p class="muted">No report diagnostics.</p>
+                      {% endif %}
+                    {% elif item.graphical_series %}
+                    <ul>
+                      {% for series in item.graphical_series[:3] %}
+                      <li>{{ series.element_type }} {{ series.element_name }} · {{ series.attribute }} · {{ '%.6f'|format(series.distance) }}</li>
+                      {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="muted">{{ item.graphical_unavailable_reason or "No graphical data was retained." }}</p>
+                    {% endif %}
+                  </details>
+                </td>
+                <td><a class="jump-link" href="#{{ item.explorer_id }}" data-explorer-target="{{ item.dom_id }}">Open {{ item.kind|lower }}</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            {% endfor %}
+          </table>
+        </div>
+      </div>
+      {% else %}
+      <p class="muted">No report or output issues require triage.</p>
+      {% endif %}
+    </section>
+
+    <section class="card" id="performance">
+      <h2>{{ duration_heading }}</h2>
+      <canvas id="runtimeChart"></canvas>
+    </section>
+
+    <section class="card">
+      <details class="compact-details">
+        <summary>Performance table ({{ engines|length }} engines × {{ models|length }} models)</summary>
+        <div class="table-scroll">
+        <table data-performance-table>
+          <thead>
+            <tr>
+              <th><button class="sort-button" type="button" data-sort-model aria-label="Sort models by name">Model</button></th>
+              {% for engine in engines %}
+              <th><button class="sort-button" type="button" data-sort-index="{{ loop.index0 }}" aria-label="Sort models by {{ engine }} analysis duration">{{ engine }}</button></th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for model in models %}
+            <tr data-model="{{ model }}">
+              <th>{{ model }}</th>
+              {% for engine in engines %}
+              {% set cell = matrix.get(engine, {}).get(model) %}
+              <td data-performance-index="{{ loop.index0 }}" data-duration="{{ cell.duration_s if cell and cell.duration_s is not none else '' }}">
+                {% if cell %}
+                  <div class="nowrap"><strong>{{ '%.3f'|format(cell.duration_s) if cell.duration_s is not none else '-' }} s</strong></div>
+                  <div class="muted">{{ '%.2f'|format(cell.peak_memory_mb) if cell.peak_memory_mb is not none else '-' }} MB</div>
+                  <div class="muted">exit {{ cell.exit_code if cell.exit_code is not none else '-' }}</div>
+                  {% if cell.error %}<div class="muted">{{ cell.error }}</div>{% endif %}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>HTML comparison criteria</h2>
+      <p class="muted">Detailed report tables are only embedded when distance is above {{ '%.0f'|format(comparison_exclusion_threshold * 100) }}% or warnings require attention. Output time-series data is retained only above that threshold. Placeholder comparisons: {{ excluded_report_comparison_count }} report-table; {{ excluded_output_comparison_count }} output. The JSON results retain every computed comparison.</p>
+    </section>
+
+    {% if interface_groups %}
+      {% for group in interface_groups %}
+      <section class="card">
+        <h2>{{ group.family | title }} interface</h2>
+        {% if group.artifact %}
+        <div class="meta-grid">
+          <div class="meta-item"><span class="meta-label">Artifact</span>{{ group.artifact.path }}</div>
+          <div class="meta-item"><span class="meta-label">Size</span>{{ group.artifact.size_bytes }} bytes</div>
+          <div class="meta-item"><span class="meta-label">SHA-256</span><code>{{ group.artifact.sha256 }}</code></div>
+        </div>
+        {% else %}
+        <p class="muted">The source engine did not produce a valid nonempty interface artifact. Dependent runs were skipped.</p>
+        {% endif %}
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Role</th>
+                <th>Engine</th>
+                <th>Analysis duration</th>
+                <th>Peak RSS</th>
+                <th>Exit</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for run in group.runs %}
+              <tr>
+                <td>{{ run.role }}</td>
+                <td>{{ run.result.engine_name }}</td>
+                <td>{{ '%.3f s'|format(run.result.duration_s) if run.result.duration_s is not none else '-' }}</td>
+                <td>{{ '%.2f MB'|format(run.result.peak_memory_mb) if run.result.peak_memory_mb is not none else '-' }}</td>
+                <td>{{ run.result.exit_code if run.result.exit_code is not none else '-' }}</td>
+                <td>{{ run.result.error or ("ok" if run.result.exit_code == 0 else "failed") }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+        {% for view in group.comparison_views %}
+          {{ render_comparisons(group.family | title ~ " — " ~ view.title ~ " report", view.reports, "No report comparisons exceeded the HTML inclusion threshold.", "Table") }}
+          {{ render_output_comparisons(group.family | title ~ " — " ~ view.title ~ " output", view.outputs, "No output comparisons exceeded the HTML inclusion threshold.") }}
+        {% endfor %}
+      {% endfor %}
+    {% else %}
+      {{ render_comparisons("Report", comparison_rows, "No report comparisons exceeded the HTML inclusion threshold.", "Table") }}
+      {{ render_output_comparisons("Output", output_drilldowns, "No output comparisons exceeded the HTML inclusion threshold.") }}
+    {% endif %}
+  </div>
+
+  <script>
+    const outputCrosshair = {
+      id: 'outputCrosshair',
+      afterDraw(chart) {
+        const active = chart.tooltip && chart.tooltip.getActiveElements();
+        if (!active || !active.length) return;
+        const x = active[0].element.x;
+        const { ctx, chartArea } = chart;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(x, chartArea.top);
+        ctx.lineTo(x, chartArea.bottom);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#64748b';
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.restore();
+      }
+    };
+
+    function distanceClass(distance) {
+      if (distance <= 0.01) return 'distance-green';
+      if (distance <= 0.1) return 'distance-yellow';
+      return 'distance-red';
+    }
+
+    function initializeOutputComparison(container) {
+      let graphInitialized = false;
+      let chart = null;
+      let selectedIndex = null;
+      let series = [];
+
+      function initializeGraph() {
+        if (graphInitialized) {
+          if (chart) chart.resize();
+          return;
+        }
+        graphInitialized = true;
+
+        const dataNode = container.querySelector('[data-output-series-data]');
+        if (!dataNode) return;
+        try {
+          series = JSON.parse(dataNode.textContent);
+          if (!Array.isArray(series) || !series.length) {
+            throw new Error('No graphical series are available.');
+          }
+          dataNode.remove();
+        } catch (error) {
+          const layout = container.querySelector('[data-graph-layout]');
+          const errorMessage = container.querySelector('[data-graph-error]');
+          if (layout) layout.hidden = true;
+          if (errorMessage) errorMessage.hidden = false;
+          return;
+        }
+
+        const typeFilter = container.querySelector('[data-type-filter]');
+        const searchInput = container.querySelector('[data-series-search]');
+        const list = container.querySelector('[data-series-list]');
+        const filterStatus = container.querySelector('[data-filter-status]');
+        const resetZoomButton = container.querySelector('[data-reset-zoom]');
+        const zoomHelp = container.querySelector('[data-zoom-help]');
+        const zoomAvailable = typeof Chart !== 'undefined'
+          && Chart.registry
+          && Chart.registry.plugins.get('zoom');
+        resetZoomButton.addEventListener('click', () => {
+          if (chart && typeof chart.resetZoom === 'function') {
+            chart.resetZoom();
+            resetZoomButton.disabled = true;
+          }
+        });
+        if (!zoomAvailable) {
+          zoomHelp.textContent = 'Zoom controls could not be loaded; the full time range is shown.';
+        }
+        const types = [...new Set(series.map(item => item.element_type))].sort();
+        types.forEach(elementType => {
+          const option = document.createElement('option');
+          option.value = elementType;
+          option.textContent = elementType;
+          typeFilter.append(option);
+        });
+
+        function filteredEntries() {
+          const type = typeFilter.value;
+          const query = searchInput.value.trim().toLocaleLowerCase();
+          return series
+            .map((item, index) => ({ item, index }))
+            .filter(({ item }) => {
+              if (type && item.element_type !== type) return false;
+              if (!query) return true;
+              return [item.element_type, item.element_name, item.attribute]
+                .some(value => value.toLocaleLowerCase().includes(query));
+            });
+        }
+
+        function renderSeries(seriesIndex) {
+          selectedIndex = seriesIndex;
+          const selected = series[seriesIndex];
+          list.querySelectorAll('[data-series-index]').forEach(button => {
+            button.setAttribute('aria-pressed', String(Number(button.dataset.seriesIndex) === seriesIndex));
+          });
+
+          const title = container.querySelector('[data-series-title]');
+          const subtitle = container.querySelector('[data-series-subtitle]');
+          const distance = container.querySelector('[data-series-distance]');
+          const status = container.querySelector('[data-chart-status]');
+          const canvas = container.querySelector('[data-output-chart]');
+          const chartFrame = container.querySelector('[data-chart-frame]');
+          const sampleTable = container.querySelector('[data-sample-table]');
+          const sampleBody = container.querySelector('[data-sample-table-body]');
+          const engineA = container.dataset.engineA;
+          const engineB = container.dataset.engineB;
+          chartFrame.hidden = false;
+          sampleTable.hidden = false;
+          title.textContent = `${selected.element_name} — ${selected.attribute}`;
+          subtitle.textContent = `Element type: ${selected.element_type}`;
+          distance.textContent = Number(selected.distance).toFixed(6);
+          canvas.setAttribute(
+            'aria-label',
+            `${selected.element_type} ${selected.element_name} ${selected.attribute}: ${engineA} compared with ${engineB}`
+          );
+
+          const retainedCount = selected.timestamps.length;
+          status.textContent = selected.sampled
+            ? `Showing ${retainedCount} representative points sampled from ${selected.source_point_count}. Missing values are shown as gaps.`
+            : `Showing all ${retainedCount} reporting points. Missing values are shown as gaps.`;
+
+          resetZoomButton.disabled = true;
+          sampleBody.replaceChildren();
+          selected.timestamps.forEach((timestamp, index) => {
+            const row = document.createElement('tr');
+            [timestamp, selected.values_a[index], selected.values_b[index]].forEach(value => {
+              const cell = document.createElement('td');
+              cell.textContent = value === null ? 'Missing' : String(value);
+              row.append(cell);
+            });
+            sampleBody.append(row);
+          });
+
+          if (typeof Chart === 'undefined') {
+            status.textContent += ' Chart.js could not be loaded.';
+            return;
+          }
+          try {
+            if (chart) chart.destroy();
+            chart = new Chart(canvas, {
+            type: 'line',
+            data: {
+              labels: selected.timestamps,
+              datasets: [
+                {
+                  label: engineA,
+                  data: selected.values_a,
+                  borderColor: '#2563eb',
+                  backgroundColor: '#2563eb',
+                  borderWidth: 2,
+                  pointRadius: selected.timestamps.length < 2 ? 4 : 0,
+                  pointHoverRadius: 5,
+                  pointStyle: 'circle',
+                  spanGaps: false
+                },
+                {
+                  label: engineB,
+                  data: selected.values_b,
+                  borderColor: '#c2410c',
+                  backgroundColor: '#c2410c',
+                  borderWidth: 2,
+                  borderDash: [7, 4],
+                  pointRadius: selected.timestamps.length < 2 ? 4 : 0,
+                  pointHoverRadius: 5,
+                  pointStyle: 'triangle',
+                  spanGaps: false
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: false,
+              normalized: true,
+              interaction: { mode: 'index', intersect: false },
+              scales: {
+                x: {
+                  title: { display: true, text: 'Reporting time' },
+                  grid: { color: '#eef2f7' },
+                  ticks: { maxTicksLimit: 10, maxRotation: 0 }
+                },
+                y: {
+                  title: { display: true, text: selected.attribute },
+                  grid: { color: '#e5e7eb' }
+                }
+              },
+              plugins: {
+                legend: {
+                  display: true,
+                  labels: { usePointStyle: true }
+                },
+                tooltip: { mode: 'index', intersect: false },
+                zoom: {
+                  limits: {
+                    x: { min: 'original', max: 'original', minRange: 2 }
+                  },
+                  pan: {
+                    enabled: true,
+                    mode: 'x',
+                    modifierKey: 'alt',
+                    onPanComplete: () => { resetZoomButton.disabled = false; }
+                  },
+                  zoom: {
+                    mode: 'x',
+                    wheel: {
+                      enabled: true,
+                      modifierKey: 'ctrl',
+                      speed: 0.1
+                    },
+                    pinch: { enabled: true },
+                    drag: {
+                      enabled: true,
+                      modifierKey: 'shift',
+                      backgroundColor: 'rgba(37, 99, 235, 0.12)',
+                      borderColor: '#2563eb',
+                      borderWidth: 1
+                    },
+                    onZoomComplete: () => { resetZoomButton.disabled = false; }
+                  }
+                }
+              }
+            },
+            plugins: [outputCrosshair]
+            });
+          } catch (error) {
+            chart = null;
+            status.textContent += ' The chart could not be displayed; use the sample table below.';
+          }
+        }
+
+        function renderList() {
+          const entries = filteredEntries();
+          list.replaceChildren();
+          filterStatus.textContent = `${entries.length} of ${series.length} series shown`;
+          if (!entries.length) {
+            selectedIndex = null;
+            if (chart) {
+              chart.destroy();
+              chart = null;
+            }
+            container.querySelector('[data-series-title]').textContent = 'No matching output series';
+            container.querySelector('[data-series-subtitle]').textContent = 'Adjust the element type or search filter.';
+            container.querySelector('[data-series-distance]').textContent = '—';
+            container.querySelector('[data-chart-status]').textContent = 'No series match the current filters.';
+            container.querySelector('[data-chart-frame]').hidden = true;
+            container.querySelector('[data-sample-table]').hidden = true;
+            container.querySelector('[data-sample-table-body]').replaceChildren();
+            resetZoomButton.disabled = true;
+            const empty = document.createElement('li');
+            empty.className = 'muted';
+            empty.textContent = 'No series match the current filters.';
+            list.append(empty);
+            return;
+          }
+          if (!entries.some(entry => entry.index === selectedIndex)) {
+            selectedIndex = entries[0].index;
+          }
+
+          entries.forEach(({ item, index }) => {
+            const row = document.createElement('li');
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'series-button';
+            button.dataset.seriesIndex = String(index);
+            button.setAttribute('aria-pressed', String(index === selectedIndex));
+
+            const top = document.createElement('span');
+            top.className = 'series-item-top';
+            const elementType = document.createElement('span');
+            elementType.className = 'series-type';
+            elementType.textContent = item.element_type;
+            const score = document.createElement('span');
+            score.className = `pill ${distanceClass(item.distance)}`;
+            score.textContent = Number(item.distance).toFixed(6);
+            top.append(elementType, score);
+
+            const elementName = document.createElement('span');
+            elementName.className = 'series-name';
+            elementName.textContent = item.element_name;
+            const attribute = document.createElement('span');
+            attribute.className = 'series-attribute';
+            attribute.textContent = item.attribute;
+            button.append(top, elementName, attribute);
+            button.addEventListener('click', () => renderSeries(index));
+            row.append(button);
+            list.append(row);
+          });
+          renderSeries(selectedIndex);
+        }
+
+        typeFilter.addEventListener('change', renderList);
+        searchInput.addEventListener('input', renderList);
+        renderList();
+      }
+      initializeGraph();
+    }
+
+    function initializeComparisonExplorer(explorer) {
+      const items = Array.from(explorer.querySelectorAll('[data-explorer-item]'));
+      const panels = Array.from(explorer.querySelectorAll('[data-explorer-panel]'));
+      const search = explorer.querySelector('[data-explorer-search]');
+      const severity = explorer.querySelector('[data-explorer-severity]');
+      const enginePair = explorer.querySelector('[data-explorer-engine-pair]');
+      const minimumDistance = explorer.querySelector('[data-explorer-min-distance]');
+      const maximumDistance = explorer.querySelector('[data-explorer-max-distance]');
+      const status = explorer.querySelector('[data-explorer-status]');
+
+      if (enginePair) {
+        [...new Set(items.map(item => item.dataset.enginePair))].sort().forEach(pair => {
+          const option = document.createElement('option');
+          option.value = pair;
+          option.textContent = pair;
+          enginePair.append(option);
+        });
+      }
+
+      function selectItem(item, moveFocus) {
+        if (!item || item.hidden) return;
+        items.forEach(candidate => candidate.setAttribute('aria-pressed', String(candidate === item)));
+        panels.forEach(panel => {
+          panel.hidden = panel.dataset.explorerPanel !== item.dataset.panelId;
+        });
+        const panel = explorer.querySelector(`[data-explorer-panel="${item.dataset.panelId}"]`);
+        const outputComparison = panel && panel.querySelector('[data-output-comparison]');
+        if (outputComparison && !outputComparison.dataset.outputInitialized) {
+          outputComparison.dataset.outputInitialized = 'true';
+          initializeOutputComparison(outputComparison);
+        }
+        if (moveFocus) item.focus();
+      }
+
+      function applyFilters() {
+        const query = (search && search.value || '').trim().toLocaleLowerCase();
+        const selectedSeverity = severity && severity.value;
+        const selectedPair = enginePair && enginePair.value;
+        const minimum = Number.parseFloat(minimumDistance && minimumDistance.value);
+        const maximum = Number.parseFloat(maximumDistance && maximumDistance.value);
+        const hasMinimum = Number.isFinite(minimum);
+        const hasMaximum = Number.isFinite(maximum);
+        let visibleCount = 0;
+        items.forEach(item => {
+          const distance = Number.parseFloat(item.dataset.distance);
+          const matchesQuery = !query || item.dataset.search.toLocaleLowerCase().includes(query);
+          const matchesSeverity = !selectedSeverity || item.dataset.severity === selectedSeverity;
+          const matchesPair = !selectedPair || item.dataset.enginePair === selectedPair;
+          const matchesMinimum = !hasMinimum || distance >= minimum;
+          const matchesMaximum = !hasMaximum || distance <= maximum;
+          const visible = matchesQuery && matchesSeverity && matchesPair && matchesMinimum && matchesMaximum;
+          item.closest('li').hidden = !visible;
+          item.hidden = !visible;
+          if (visible) visibleCount += 1;
+        });
+        if (status) status.textContent = `${visibleCount} of ${items.length} comparisons shown`;
+        const selected = items.find(item => item.getAttribute('aria-pressed') === 'true' && !item.hidden);
+        const fallback = items.find(item => !item.hidden);
+        panels.forEach(panel => { panel.hidden = true; });
+        if (selected || fallback) selectItem(selected || fallback, false);
+      }
+
+      items.forEach(item => {
+        item.addEventListener('click', () => selectItem(item, false));
+      });
+      if (search) search.addEventListener('input', applyFilters);
+      if (severity) severity.addEventListener('change', applyFilters);
+      if (enginePair) enginePair.addEventListener('change', applyFilters);
+      if (minimumDistance) minimumDistance.addEventListener('input', applyFilters);
+      if (maximumDistance) maximumDistance.addEventListener('input', applyFilters);
+      applyFilters();
+    }
+    function initializeIssueQueue(container) {
+      const table = container.querySelector('[data-issue-queue]');
+      if (!table) return;
+      const groups = Array.from(table.querySelectorAll('[data-issue-group]'));
+      const rows = groups.flatMap(group => Array.from(group.querySelectorAll('[data-issue-row]')));
+      const search = container.querySelector('[data-issue-search]');
+      const kind = container.querySelector('[data-issue-kind]');
+      const severity = container.querySelector('[data-issue-severity]');
+      const enginePair = container.querySelector('[data-issue-engine-pair]');
+      const minimumDistance = container.querySelector('[data-issue-min-distance]');
+      const maximumDistance = container.querySelector('[data-issue-max-distance]');
+      const status = container.querySelector('[data-issue-status]');
+      const chips = Array.from(container.querySelectorAll('[data-issue-chip]'));
+      const collapseAll = container.querySelector('[data-issue-collapse-all]');
+      const expandFiltered = container.querySelector('[data-issue-expand-filtered]');
+
+      [...new Set(rows.map(row => row.dataset.issueEnginePair))].sort().forEach(pair => {
+        const option = document.createElement('option');
+        option.value = pair;
+        option.textContent = pair;
+        enginePair.append(option);
+      });
+
+      function setGroupExpanded(group, expanded) {
+        group.dataset.collapsed = String(!expanded);
+        group.querySelectorAll('[data-issue-toggle]').forEach(button => {
+          button.setAttribute('aria-expanded', String(expanded));
+          if (button.dataset.issueCollapseLabel !== undefined) {
+            button.textContent = expanded ? 'Collapse' : 'Expand';
+          }
+        });
+      }
+
+      function updateChips() {
+        chips.forEach(chip => {
+          chip.setAttribute('aria-pressed', String(chip.dataset.issueChip === severity.value));
+        });
+      }
+
+      function applyFilters() {
+        const query = search.value.trim().toLocaleLowerCase();
+        const selectedKind = kind.value;
+        const selectedSeverity = severity.value;
+        const selectedPair = enginePair.value;
+        const minimum = Number.parseFloat(minimumDistance.value);
+        const maximum = Number.parseFloat(maximumDistance.value);
+        const hasMinimum = Number.isFinite(minimum);
+        const hasMaximum = Number.isFinite(maximum);
+        let visibleCount = 0;
+        let visibleGroups = 0;
+        groups.forEach(group => {
+          let groupVisible = 0;
+          group.querySelectorAll('[data-issue-row]').forEach(row => {
+            const distance = Number.parseFloat(row.dataset.issueDistance);
+            const visible =
+              (!query || row.dataset.issueSearch.toLocaleLowerCase().includes(query)) &&
+              (!selectedKind || row.dataset.issueKind === selectedKind) &&
+              (!selectedSeverity || row.dataset.issueSeverity === selectedSeverity) &&
+              (!selectedPair || row.dataset.issueEnginePair === selectedPair) &&
+              (!hasMinimum || distance >= minimum) &&
+              (!hasMaximum || distance <= maximum);
+            row.hidden = !visible;
+            if (visible) {
+              groupVisible += 1;
+              visibleCount += 1;
+            }
+          });
+          group.hidden = groupVisible === 0;
+          if (groupVisible) visibleGroups += 1;
+        });
+        status.textContent = `${visibleCount} of ${rows.length} issues shown across ${visibleGroups} models`;
+      }
+
+      function sortGroups(key, button) {
+        const descending = button.dataset.sortDirection !== 'desc';
+        table.querySelectorAll('[data-issue-sort]').forEach(item => {
+          delete item.dataset.sortDirection;
+        });
+        button.dataset.sortDirection = descending ? 'desc' : 'asc';
+        const value = group => group.dataset[`issue${key[0].toUpperCase()}${key.slice(1)}`];
+        groups
+          .sort((a, b) => {
+            if (key === 'distance' || key === 'diagnostics') {
+              return (Number(value(a)) - Number(value(b))) * (descending ? -1 : 1);
+            }
+            return value(a).localeCompare(value(b)) * (descending ? -1 : 1);
+          })
+          .forEach(group => table.append(group));
+      }
+
+      groups.forEach(group => {
+        group.querySelectorAll('[data-issue-toggle]').forEach(button => {
+          button.addEventListener('click', () => {
+            setGroupExpanded(group, group.dataset.collapsed === 'true');
+          });
+        });
+      });
+      collapseAll.addEventListener('click', () => {
+        groups.forEach(group => setGroupExpanded(group, false));
+      });
+      expandFiltered.addEventListener('click', () => {
+        groups.filter(group => !group.hidden).forEach(group => {
+          setGroupExpanded(group, true);
+        });
+      });
+      chips.forEach(chip => {
+        chip.addEventListener('click', () => {
+          severity.value = chip.dataset.issueChip;
+          updateChips();
+          applyFilters();
+        });
+      });
+      if (search) search.addEventListener('input', applyFilters);
+      if (kind) kind.addEventListener('change', applyFilters);
+      if (severity) severity.addEventListener('change', () => {
+        updateChips();
+        applyFilters();
+      });
+      if (enginePair) enginePair.addEventListener('change', applyFilters);
+      if (minimumDistance) minimumDistance.addEventListener('input', applyFilters);
+      if (maximumDistance) maximumDistance.addEventListener('input', applyFilters);
+      table.querySelectorAll('[data-issue-sort]').forEach(button => {
+        button.addEventListener('click', event => {
+          sortGroups(event.currentTarget.dataset.issueSort, event.currentTarget);
+        });
+      });
+      updateChips();
+      applyFilters();
+    }
+
+
+    document.querySelectorAll('[data-comparison-explorer]').forEach(initializeComparisonExplorer);
+    document.querySelectorAll('[data-issue-queue-container]').forEach(initializeIssueQueue);
+
+    document.querySelectorAll('[data-explorer-target]').forEach(link => {
+      link.addEventListener('click', event => {
+        const target = link.dataset.explorerTarget;
+        const item = target && document.querySelector(`[data-explorer-item][data-panel-id="${target}"]`);
+        if (!item) return;
+        event.preventDefault();
+        item.closest('[data-comparison-explorer]').scrollIntoView({ block: 'start' });
+        item.click();
+      });
+    });
+
+    document.querySelectorAll('[data-performance-table]').forEach(table => {
+      const tbody = table.tBodies[0];
+      const rows = () => Array.from(tbody.rows);
+      function sortRows(compare, button) {
+        const descending = button.dataset.sortDirection !== 'desc';
+        table.querySelectorAll('.sort-button').forEach(item => { delete item.dataset.sortDirection; });
+        button.dataset.sortDirection = descending ? 'desc' : 'asc';
+        rows().sort((a, b) => compare(a, b, descending)).forEach(row => tbody.append(row));
+      }
+      table.querySelector('[data-sort-model]')?.addEventListener('click', event => {
+        sortRows((a, b, descending) => a.dataset.model.localeCompare(b.dataset.model) * (descending ? -1 : 1), event.currentTarget);
+      });
+      table.querySelectorAll('[data-sort-index]').forEach(button => {
+        button.addEventListener('click', event => {
+          const index = event.currentTarget.dataset.sortIndex;
+          sortRows((a, b, descending) => {
+            const valueA = Number(a.querySelector(`[data-performance-index="${index}"]`)?.dataset.duration);
+            const valueB = Number(b.querySelector(`[data-performance-index="${index}"]`)?.dataset.duration);
+            if (!Number.isFinite(valueA) && !Number.isFinite(valueB)) return 0;
+            if (!Number.isFinite(valueA)) return 1;
+            if (!Number.isFinite(valueB)) return -1;
+            return (valueA - valueB) * (descending ? -1 : 1);
+          }, event.currentTarget);
+        });
+      });
+    });
+
+    if (typeof Chart !== 'undefined') {
+      const runtimeChart = document.getElementById('runtimeChart');
+      new Chart(runtimeChart, {
+        type: 'bar',
+        data: {
+          labels: {{ chart_labels | tojson }},
+          datasets: [{
+            label: {{ duration_chart_label | tojson }},
+            data: {{ chart_values | tojson }},
+            backgroundColor: '#60a5fa',
+            borderColor: '#2563eb',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: 'Seconds' }
+            }
+          },
+          plugins: {
+            legend: { display: false }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>

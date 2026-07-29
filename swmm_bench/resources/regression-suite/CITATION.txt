@@ -1,0 +1,35 @@
+Curated regression models in this directory were copied from the SWMMEnablement/1729-SWMM5-Models repository that is referenced by this repository as the `models/1729-SWMM5-Models` submodule.
+
+Source repository:
+https://github.com/SWMMEnablement/1729-SWMM5-Models
+
+Source commit used for curation:
+f2965816381a474f9b1ba7483408a0390a44278e
+
+Copied source files:
+- EPA/Example_LID_RB.inp -> hydrology/lid-example_lid_rb.inp
+- Hydrology/SI_GW_Model.inp -> hydrology/groundwater-si_gw_model.inp
+- SWMM5_NCIMM/small_snowmelt_model.inp -> hydrology/snowmelt-small_snowmelt_model.inp
+- OWA_update_v5111/events_example.inp -> water-quality/waterquality-events_example.inp
+- DataFiles/events_example.dat -> water-quality/events_example.dat (bundled sidecar for the two water-quality inputs)
+- Hydraulics/inlet_capture_test.inp -> hydraulics/inlets-inlet_capture_test.inp
+- EPA/ALL_Outfall_Types_Model.inp -> hydraulics/outfalls-all_outfall_types_model.inp
+- EPA/swmm5_shapes.inp -> hydraulics/shapes-swmm5_shapes.inp
+- EPA/Master_Extran_RTC.inp -> controls/rtc-master_extran_rtc.inp
+- OWA_ROUTING/routing_kinwave.inp -> routing/kinwave-routing_kinwave.inp
+- Hydraulics/attenuation_steady_flow.inp -> routing/steady-attenuation_steady_flow.inp
+
+Derived models (edited variants of curated files above):
+- hydrology/groundwater-si_gw_model.inp -> hydrology/rdii-assignment_groundwater-si_gw_model.inp
+- hydrology/lid-example_lid_rb.inp -> hydrology/curvenumber-lid-example_lid_rb.inp
+- water-quality/waterquality-events_example.inp -> water-quality/treatment-waterquality-events_example.inp
+- hydraulics/outfalls-all_outfall_types_model.inp -> hydraulics/elevation-offsets_outfalls-all_outfall_types_model.inp
+
+Canonical interface USE models and fixtures:
+- complex/rtk.inp -> use_interfaces/rdii-use-rtk.inp
+- complex/gw-events-wq.inp -> use_interfaces/rainfall-use-gw-events-wq.inp
+- complex/gw-events-wq.inp -> use_interfaces/runoff-use-gw-events-wq.inp
+- complex/gw-events-wq.inp -> use_interfaces/hotstart-use-gw-events-wq.inp
+- use_interfaces/inflows-use-toy.inp is purpose-built for routing interface coverage.
+- The matching interface fixtures were generated with the official EPA SWMM v5.2.4 solver:
+  https://github.com/USEPA/Stormwater-Management-Model/releases/tag/v5.2.4

@@ -1,0 +1,345 @@
+from __future__ import annotations
+
+import json
+import os
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from rich.text import Text
+from typer.testing import CliRunner
+from swmm.pandas import example_out_path
+
+from swmm_bench.cli import app, test_app as regression_app
+
+
+class RegressionCliTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.runner = CliRunner()
+
+    def test_suite_list_groups_models_and_shows_usage(self) -> None:
+        result = self.runner.invoke(regression_app, ["list"])
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        plain_output = Text.from_ansi(result.output).plain
+        self.assertIn("hydrology (5)", plain_output)
+        self.assertIn("water-quality/waterquality-events_example.inp", plain_output)
+        self.assertIn("swmm-test run /path/to/swmm", plain_output)
+        self.assertIn("--category hydrology", plain_output)
+        self.assertIn("--model", plain_output)
+        self.assertIn("water-quality/waterquality-events_example.inp", plain_output)
+
+    def test_suite_run_records_stable_model_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            engine = root / "fake-swmm"
+            engine.write_text(
+                "#!/usr/bin/env python3\n"
+                "import pathlib\n"
+                "import sys\n"
+                "pathlib.Path(sys.argv[2]).write_text('report\\n', encoding='utf-8')\n",
+                encoding="utf-8",
+            )
+            engine.chmod(0o755)
+            output_dir = root / "results"
+
+            result = self.runner.invoke(
+                regression_app,
+                [
+                    "run",
+                    str(engine),
+                    "--model",
+                    "complex/rtk.inp",
+                    "--name",
+                    "suite-test",
+                    "--output-dir",
+                    str(output_dir),
+                    "--no-html",
+                ],
+            )
+
+            self.assertEqual(result.exit_code, 0, result.output)
+            results_json = output_dir / "suite-test" / "results.json"
+            data = json.loads(results_json.read_text(encoding="utf-8"))
+            engine_result = data["engine_results"][0]
+            self.assertEqual(data["schema_version"], "5")
+            self.assertIsNone(engine_result["out_path"])
+            self.assertEqual(data["output_comparisons"], [])
+            self.assertEqual(
+                engine_result["inp_name"],
+                "complex/rtk.inp",
+            )
+            self.assertEqual(
+                engine_result["inp_path"],
+                "bundled://regression-suite/complex/rtk.inp",
+            )
+
+
+class BenchmarkCliTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.runner = CliRunner()
+
+    def test_run_uses_bundled_benchmarks_when_inp_is_omitted(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            engine = root / "fake-swmm"
+            engine.write_text(
+                "#!/usr/bin/env python3\n"
+                "import pathlib\n"
+                "import sys\n"
+                "pathlib.Path(sys.argv[2]).write_text('report\\n', encoding='utf-8')\n",
+                encoding="utf-8",
+            )
+            engine.chmod(0o755)
+            output_dir = root / "results"
+
+            result = self.runner.invoke(
+                app,
+                [
+                    "run",
+                    str(engine),
+                    "--name",
+                    "bundled-benchmark",
+                    "--output-dir",
+                    str(output_dir),
+                    "--no-html",
+                ],
+            )
+
+            self.assertEqual(result.exit_code, 0, result.output)
+            data = json.loads(
+                (output_dir / "bundled-benchmark" / "results.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(
+                {item["inp_path"] for item in data["engine_results"]},
+                {
+                    "bundled://benchmarks/complex/gw-events-wq.inp",
+                    "bundled://benchmarks/complex/rtk.inp",
+                },
+            )
+
+    def test_rebuild_restores_report_json_and_html_from_saved_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            run_directory = root / "previous-run"
+            case_directory = run_directory / "fake-swmm" / "model-a"
+            (case_directory / "model").mkdir(parents=True)
+            (case_directory / "model" / "Model.inp").write_text(
+                "[TITLE]\n", encoding="utf-8"
+            )
+            (case_directory / "result.rpt").write_text("report\n", encoding="utf-8")
+
+            with patch(
+                "swmm_bench.cli.compare_all_outputs", return_value=[]
+            ) as compare_outputs:
+                rebuild_result = self.runner.invoke(
+                    app, ["rebuild", str(run_directory), "--outputs"]
+                )
+
+            self.assertEqual(rebuild_result.exit_code, 0, rebuild_result.output)
+            plain_output = Text.from_ansi(rebuild_result.output).plain
+            self.assertIn("Comparing reports: no engine pairs", plain_output)
+            self.assertIn("Comparing binary outputs: no engine pairs", plain_output)
+            self.assertIn("Writing JSON results", plain_output)
+            report_json = run_directory / "report.json"
+            data = json.loads(report_json.read_text(encoding="utf-8"))
+            self.assertEqual(data["name"], "previous-run")
+            self.assertEqual(data["engine_results"][0]["engine_name"], "fake-swmm")
+            self.assertEqual(data["engine_results"][0]["inp_name"], "model-a")
+            self.assertEqual(data["output_comparisons"], [])
+            self.assertFalse(compare_outputs.call_args.kwargs["retain_graphical"])
+
+            report_html = root / "report.html"
+            report_result = self.runner.invoke(
+                app, ["report", str(report_json), "--output", str(report_html)]
+            )
+
+            self.assertEqual(report_result.exit_code, 0, report_result.output)
+            self.assertTrue(report_html.exists())
+
+    def test_run_records_output_comparisons_without_report_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            inp_path = root / "Model.inp"
+            inp_path.write_text("[TITLE]\n", encoding="utf-8")
+            engines = []
+            for name in ("fake-swmm-a", "fake-swmm-b"):
+                engine = root / name
+                engine.write_text(
+                    "#!/usr/bin/env python3\n"
+                    "import pathlib\n"
+                    "import shutil\n"
+                    "import sys\n"
+                    f"shutil.copyfile({str(example_out_path)!r}, sys.argv[3])\n",
+                    encoding="utf-8",
+                )
+                engine.chmod(0o755)
+                engines.append(engine)
+
+            output_dir = root / "results"
+            result = self.runner.invoke(
+                app,
+                [
+                    "run",
+                    *(str(engine) for engine in engines),
+                    "--inp",
+                    str(inp_path),
+                    "--name",
+                    "output-test",
+                    "--output-dir",
+                    str(output_dir),
+                    "--no-html",
+                ],
+            )
+
+            self.assertEqual(result.exit_code, 0, result.output)
+            plain_output = Text.from_ansi(result.output).plain
+            self.assertIn("Loading binary output", plain_output)
+            self.assertNotIn("Preparing chart data", plain_output)
+            self.assertIn("Writing JSON results", plain_output)
+            results_json = output_dir / "output-test" / "results.json"
+            data = json.loads(results_json.read_text())
+            self.assertEqual(data["schema_version"], "5")
+            self.assertEqual(data["comparisons"], [])
+            self.assertEqual(len(data["output_comparisons"]), 1)
+            output_comparison = data["output_comparisons"][0]
+            self.assertEqual(output_comparison["overall_distance"], 0.0)
+            self.assertEqual(
+                output_comparison["metric"],
+                "normalized-rmse-missing-v1",
+            )
+            self.assertEqual(output_comparison["section_comparisons"], [])
+            self.assertEqual(output_comparison["graphical_series"], [])
+            self.assertFalse(output_comparison["details_retained"])
+            self.assertTrue(all(row["out_path"] for row in data["engine_results"]))
+
+            for row in data["engine_results"]:
+                Path(row["out_path"]).unlink()
+            report_path = root / "regenerated-report.html"
+            report_result = self.runner.invoke(
+                app,
+                ["report", str(results_json), "--output", str(report_path)],
+            )
+
+            self.assertEqual(report_result.exit_code, 0, report_result.output)
+            report_html = report_path.read_text(encoding="utf-8")
+            self.assertNotIn('<script type="application/json"', report_html)
+            self.assertIn("HTML comparison criteria", report_html)
+            self.assertIn(
+                "Placeholder comparisons: 1 report-table; 1 output", report_html
+            )
+            self.assertIn(
+                "0.000000 did not meet inclusion threshold of 0.010000", report_html
+            )
+
+    def test_report_command_autoescapes_saved_json_values(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            results_json = root / "results.json"
+            results_json.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "3",
+                        "name": "<script>alert('name')</script>",
+                        "timestamp": "2026-07-20T00:00:00+00:00",
+                        "platform": {"host": "test", "os": "test", "python": "test"},
+                        "engine_results": [],
+                        "comparisons": [],
+                        "output_comparisons": [
+                            {
+                                "inp_path": "model.inp",
+                                "inp_name": "<img src=x onerror=alert('model')>",
+                                "engine_a": 'a" onmouseover="alert(1)',
+                                "engine_b": "b",
+                                "overall_distance": 0.5,
+                                "section_comparisons": [],
+                                "graphical_series": [],
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            report_path = root / "report.html"
+
+            result = self.runner.invoke(
+                app,
+                ["report", str(results_json), "--output", str(report_path)],
+            )
+
+            self.assertEqual(result.exit_code, 0, result.output)
+            html = report_path.read_text(encoding="utf-8")
+            self.assertNotIn("<script>alert('name')</script>", html)
+            self.assertNotIn("<img src=x onerror=alert('model')>", html)
+            self.assertIn("&lt;script&gt;alert(&#39;name&#39;)&lt;/script&gt;", html)
+            self.assertIn(
+                'data-engine-a="a&#34; onmouseover=&#34;alert(1)"',
+                html,
+            )
+
+
+class RegressionEngineCliTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.runner = CliRunner()
+
+    def test_suite_run_resolves_engine_from_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            engine = bin_dir / "fake-swmm"
+            engine.write_text(
+                "#!/usr/bin/env python3\n"
+                "import pathlib\n"
+                "import sys\n"
+                "pathlib.Path(sys.argv[2]).write_text('report\\n', encoding='utf-8')\n",
+                encoding="utf-8",
+            )
+            engine.chmod(0o755)
+            output_dir = root / "results"
+            env = {
+                **os.environ,
+                "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = self.runner.invoke(
+                regression_app,
+                [
+                    "run",
+                    "fake-swmm",
+                    "--model",
+                    "complex/rtk.inp",
+                    "--name",
+                    "path-test",
+                    "--output-dir",
+                    str(output_dir),
+                    "--no-html",
+                ],
+                env=env,
+            )
+
+            self.assertEqual(result.exit_code, 0, result.output)
+            self.assertTrue((output_dir / "path-test" / "results.json").exists())
+
+    def test_suite_run_rejects_conflicting_selectors(self) -> None:
+        result = self.runner.invoke(
+            regression_app,
+            [
+                "run",
+                "/not/an/executable",
+                "--category",
+                "hydrology",
+                "--model",
+                "hydrology/lid-example_lid_rb.inp",
+            ],
+        )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("Specify either a category or a model", result.output)
+
+
+if __name__ == "__main__":
+    unittest.main()

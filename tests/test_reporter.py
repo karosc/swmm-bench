@@ -1,0 +1,619 @@
+from __future__ import annotations
+
+import math
+import tempfile
+import unittest
+from pathlib import Path
+
+from swmm_bench.models import (
+    BenchmarkResult,
+    EngineResult,
+    OUTPUT_DISTANCE_METRIC_LEGACY,
+    ModelComparison,
+    OutputComparison,
+    OutputSectionComparison,
+    OutputSeriesComparison,
+    SectionComparison,
+)
+from swmm_bench.reporter import render_html, save_json
+
+
+class ReporterTests(unittest.TestCase):
+    def test_duration_label_tracks_schema_semantics(self) -> None:
+        for schema_version, expected in (
+            ("4", "Average runtime by engine"),
+            ("5", "Average analysis duration by engine"),
+        ):
+            with self.subTest(schema_version=schema_version):
+                result = BenchmarkResult(
+                    schema_version=schema_version,
+                    name="duration-label",
+                    timestamp="2026-07-20T00:00:00+00:00",
+                    platform={"host": "test", "os": "test", "python": "test"},
+                    engine_results=[],
+                    comparisons=[],
+                )
+                with tempfile.TemporaryDirectory() as temporary_directory:
+                    output = Path(temporary_directory) / "report.html"
+                    render_html(result, output)
+                    html = output.read_text(encoding="utf-8")
+
+                self.assertIn(expected, html)
+
+    def test_comparison_drilldown_labels_report_tables(self) -> None:
+        result = BenchmarkResult(
+            schema_version="4",
+            name="table-diff",
+            timestamp="2026-07-19T00:00:00+00:00",
+            platform={
+                "host": "test",
+                "system": "test",
+                "release": "test",
+                "machine": "test",
+                "python": "test",
+            },
+            engine_results=[],
+            comparisons=[
+                ModelComparison(
+                    inp_path="model.inp",
+                    inp_name="model.inp",
+                    engine_a="a",
+                    engine_b="b",
+                    overall_distance=0.5,
+                    section_comparisons=[
+                        SectionComparison(
+                            section_name="node_depth_summary",
+                            distance=0.0,
+                            row_count_a=1,
+                            row_count_b=1,
+                            differences=[
+                                {
+                                    "row": "J1",
+                                    "column": "depth",
+                                    "value_a": 1.0,
+                                    "value_b": 2.0,
+                                    "abs_diff": 1.0,
+                                    "rel_diff": 1.0,
+                                }
+                            ],
+                        )
+                    ],
+                ),
+                ModelComparison(
+                    inp_path="matching-report.inp",
+                    inp_name="matching-report.inp",
+                    engine_a="a",
+                    engine_b="b",
+                    overall_distance=0.01,
+                    section_comparisons=[],
+                ),
+                ModelComparison(
+                    inp_path="warning-report.inp",
+                    inp_name="warning-report.inp",
+                    engine_a="a",
+                    engine_b="b",
+                    overall_distance=0.0,
+                    section_comparisons=[
+                        SectionComparison(
+                            section_name="bad_table",
+                            distance=1.0,
+                            row_count_a=0,
+                            row_count_b=1,
+                            differences=[],
+                            note="Table could not be parsed for a; parsed only for b.",
+                        )
+                    ],
+                    report_warnings=[
+                        "WARNING: table 'bad_table' could not be parsed: bad table"
+                    ],
+                ),
+                ModelComparison(
+                    inp_path="error-report.inp",
+                    inp_name="error-report.inp",
+                    engine_a="a",
+                    engine_b="b",
+                    overall_distance=0.0,
+                    section_comparisons=[],
+                    report_errors=[
+                        "ERROR 101: simulation failed",
+                        "ERROR 102: output failed",
+                    ],
+                    report_warnings=[
+                        "WARNING 09: timestep reduced",
+                        "WARNING 10: continuity warning",
+                    ],
+                    report_errors_a=["ERROR 101: simulation failed"],
+                    report_errors_b=["ERROR 102: output failed"],
+                    report_warnings_a=["WARNING 09: timestep reduced"],
+                    report_warnings_b=["WARNING 10: continuity warning"],
+                ),
+            ],
+            output_comparisons=[
+                OutputComparison(
+                    inp_path="model.inp",
+                    inp_name="model.inp",
+                    engine_a="a",
+                    engine_b="b",
+                    overall_distance=0.5,
+                    section_comparisons=[
+                        OutputSectionComparison(
+                            section_name='["node","J1","hydraulic_head"]',
+                            distance=0.5,
+                            row_count_a=2,
+                            row_count_b=2,
+                            differences=[
+                                {
+                                    "row": "2020-01-01T00:05:00",
+                                    "value_a": None,
+                                    "value_b": 2.0,
+                                    "issue": "null value in A",
+                                    "abs_diff": None,
+                                    "rel_diff": 1.0,
+                                }
+                            ],
+                            difference_count=1,
+                            numeric_distance=0.4,
+                            missing_fraction=1.0 / 6.0,
+                            finite_pair_count=1,
+                            missing_count=1,
+                            both_null_count=0,
+                            timestamp_count=2,
+                        )
+                    ],
+                    graphical_series=[
+                        OutputSeriesComparison(
+                            element_type="node",
+                            element_name='J1 & "north"',
+                            attribute="hydraulic_head",
+                            distance=0.5,
+                            row_count_a=2,
+                            row_count_b=2,
+                            timestamps=["2020-01-01T00:00:00", "2020-01-01T00:05:00"],
+                            values_a=[1.0, None],
+                            values_b=[1.5, 2.0],
+                            source_point_count=2,
+                        )
+                    ],
+                ),
+                OutputComparison(
+                    inp_path="matching-output.inp",
+                    inp_name="matching-output.inp",
+                    engine_a="a",
+                    engine_b="b",
+                    overall_distance=0.0,
+                    section_comparisons=[],
+                ),
+                OutputComparison(
+                    inp_path="summary-only-output.inp",
+                    inp_name="summary-only-output.inp",
+                    engine_a="a",
+                    engine_b="b",
+                    overall_distance=0.001,
+                    section_comparisons=[
+                        OutputSectionComparison(
+                            section_name="summary-only-series",
+                            distance=0.001,
+                            row_count_a=1,
+                            row_count_b=1,
+                            differences=[],
+                        )
+                    ],
+                    details_retained=False,
+                ),
+            ],
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output = Path(temporary_directory) / "report.html"
+            render_html(result, output)
+            html = output.read_text(encoding="utf-8")
+
+        self.assertIn("<th>Table</th>", html)
+        self.assertNotIn("<th>Series</th>", html)
+        self.assertNotIn(">Tabular</button>", html)
+        self.assertNotIn('role="tablist"', html)
+        self.assertIn("graphical view loads on click", html)
+        self.assertIn("Element type", html)
+        self.assertIn("Search element or attribute", html)
+        self.assertIn("Overall output distance", html)
+        self.assertIn("Selected series distance", html)
+        self.assertIn("Symmetric NRMSE + missing penalty", html)
+        self.assertIn("About output distance", html)
+        self.assertIn('aria-hidden="true">ⓘ</span>', html)
+        self.assertIn("numeric distance = min(RMSE(A − B)", html)
+        self.assertIn("series distance = missing fraction", html)
+        self.assertIn("equal-weight arithmetic mean", html)
+        self.assertIn("Report-table comparisons use a separate", html)
+        self.assertIn('type="application/json"', html)
+        self.assertIn('J1 \\u0026 \\"north\\"', html)
+        self.assertNotIn('J1 & "north"', html)
+        self.assertIn("pointRadius: selected.timestamps.length < 2 ? 4 : 0", html)
+        self.assertIn("View plotted samples as a table", html)
+        self.assertIn("data-sample-table-body", html)
+        self.assertIn("outline: 3px solid var(--accent)", html)
+        self.assertIn("data-graph-error", html)
+        self.assertIn("data-chart-frame", html)
+        self.assertIn("No matching output series", html)
+        self.assertIn("chart.destroy();", html)
+        self.assertIn("chartjs-plugin-zoom@2.2.0", html)
+        self.assertIn("hammerjs@2.0.8", html)
+        self.assertIn("data-reset-zoom", html)
+        self.assertIn("Reset zoom", html)
+        self.assertIn("Ctrl + wheel or pinch to zoom time", html)
+        self.assertIn("modifierKey: 'ctrl'", html)
+        self.assertIn("modifierKey: 'shift'", html)
+        self.assertIn("modifierKey: 'alt'", html)
+        self.assertIn("chart.resetZoom();", html)
+        self.assertIn("HTML comparison criteria", html)
+        self.assertIn("distance is above 1%", html)
+        self.assertIn("Disagreement overview", html)
+        self.assertIn("Issue queue", html)
+        self.assertIn("data-issue-queue", html)
+        self.assertIn("data-issue-kind", html)
+        self.assertIn("data-issue-chip", html)
+        self.assertIn("data-issue-sort", html)
+        self.assertIn("data-issue-toggle", html)
+        self.assertIn("Preview", html)
+        self.assertIn("issue-summary-filter", html)
+        self.assertIn("issue-toolbar", html)
+        self.assertIn("data-issue-collapse-all", html)
+        self.assertIn("data-issue-expand-filtered", html)
+        self.assertIn("Performance table (0 engines × 0 models)", html)
+        self.assertIn("data-performance-table", html)
+        self.assertIn("data-sort-model", html)
+        self.assertIn("data-sort-index", html)
+        self.assertIn("data-performance-index", html)
+        self.assertIn("Graph JSON is parsed only after opening", html)
+        self.assertIn("Report comparison explorer", html)
+        self.assertIn("Search model or engine", html)
+        self.assertIn("data-comparison-explorer", html)
+        self.assertIn("data-explorer-target", html)
+        self.assertIn('class="section-nav"', html)
+        self.assertIn('href="#overview"', html)
+        self.assertIn('href="#performance"', html)
+        self.assertIn("data-explorer-engine-pair", html)
+        self.assertIn("data-explorer-min-distance", html)
+        self.assertIn("data-explorer-max-distance", html)
+        self.assertIn("data-engine-pair=", html)
+        self.assertIn("data-distance=", html)
+        self.assertIn("Placeholder comparisons: 2 report-table; 2 output", html)
+        self.assertIn("warning-report.inp", html)
+        self.assertIn(
+            "WARNING: table &#39;bad_table&#39; could not be parsed: bad table",
+            html,
+        )
+        self.assertIn('data-has-warnings="true"', html)
+        self.assertIn("warning-badge", html)
+        self.assertIn("error-report.inp", html)
+        self.assertIn('data-severity="failed"', html)
+        self.assertIn(">ERROR 101: simulation failed</td>", html)
+        self.assertIn(">ERROR 102: output failed</td>", html)
+        self.assertIn(">WARNING 09: timestep reduced</td>", html)
+        self.assertIn(">WARNING 10: continuity warning</td>", html)
+        self.assertIn("Comparison cannot be made: a and b models failed.", html)
+        self.assertIn("Report diagnostics", html)
+        self.assertIn("2 errors", html)
+        self.assertIn("3 warnings", html)
+        self.assertIn("missing table", html)
+        self.assertIn("Table could not be parsed for a; parsed only for b.", html)
+        self.assertIn("<th>Rows a</th>", html)
+        self.assertIn("<th>Rows b</th>", html)
+        self.assertIn("<th>a</th>", html)
+        self.assertIn("<th>b</th>", html)
+        self.assertIn("matching-report.inp", html)
+        self.assertIn("matching-output.inp", html)
+        self.assertIn("0.010000 did not meet inclusion threshold of 0.010000", html)
+        self.assertIn("0.000000 did not meet inclusion threshold of 0.010000", html)
+        self.assertIn("summary-only-output.inp", html)
+        self.assertIn("0.001000 did not meet inclusion threshold of 0.010000", html)
+        self.assertNotIn("summary-only-series", html)
+
+    def test_html_retains_all_above_threshold_output_graphs(self) -> None:
+        comparisons = [
+            OutputComparison(
+                inp_path=f"model-{index}.inp",
+                inp_name=f"model-{index}.inp",
+                engine_a="a",
+                engine_b="b",
+                section_comparisons=[],
+                overall_distance=0.02,
+                graphical_series=[
+                    OutputSeriesComparison(
+                        element_type="node",
+                        element_name="J1",
+                        attribute="depth",
+                        distance=0.02,
+                        row_count_a=2,
+                        row_count_b=2,
+                        timestamps=["2020-01-01T00:00:00", "2020-01-01T00:05:00"],
+                        values_a=[1.0, 2.0],
+                        values_b=[1.1, 2.1],
+                        source_point_count=2,
+                    )
+                ],
+            )
+            for index in range(13)
+        ]
+        result = BenchmarkResult(
+            schema_version="5",
+            name="all-output-graphs",
+            timestamp="2026-07-27T00:00:00+00:00",
+            platform={"host": "test", "os": "test", "python": "test"},
+            engine_results=[],
+            comparisons=[],
+            output_comparisons=comparisons,
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output = Path(temporary_directory) / "report.html"
+            render_html(result, output)
+            html = output.read_text(encoding="utf-8")
+
+        self.assertEqual(html.count(" data-output-series-data>"), 13)
+        self.assertNotIn("Graphical data was omitted from this HTML report", html)
+
+    def test_issue_queue_includes_failed_engine_pairs(self) -> None:
+        engine_results = [
+            EngineResult(
+                engine_path=f"/{name}",
+                engine_name=name,
+                inp_path="model.inp",
+                inp_name="model.inp",
+                duration_s=1.0 if exit_code == 0 else None,
+                peak_memory_mb=1.0 if exit_code == 0 else None,
+                exit_code=exit_code,
+                rpt_path=f"/tmp/{name}.rpt" if exit_code == 0 else None,
+                stdout="",
+                stderr="failed" if exit_code else "",
+                error="failed" if exit_code else None,
+                out_path=f"/tmp/{name}.out" if exit_code == 0 else None,
+            )
+            for name, exit_code in (("a", 0), ("b", 0), ("failed", 1))
+        ]
+        result = BenchmarkResult(
+            schema_version="5",
+            name="priority-output",
+            timestamp="2026-07-27T00:00:00+00:00",
+            platform={"host": "test", "os": "test", "python": "test"},
+            engine_results=engine_results,
+            comparisons=[],
+            output_comparisons=[
+                OutputComparison(
+                    inp_path="model.inp",
+                    inp_name="model.inp",
+                    engine_a="a",
+                    engine_b="b",
+                    overall_distance=0.5,
+                    section_comparisons=[],
+                )
+            ],
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output = Path(temporary_directory) / "report.html"
+            render_html(result, output)
+            html = output.read_text(encoding="utf-8")
+
+        issue_queue = html.split("data-issue-queue", maxsplit=1)[1].split(
+            "</table>", maxsplit=1
+        )[0]
+        self.assertIn("a vs b", issue_queue)
+        self.assertIn("a vs failed", issue_queue)
+        self.assertEqual(
+            issue_queue.count("<td>model.inp</td>"),
+            issue_queue.count("data-issue-row"),
+        )
+        self.assertIn("b vs failed", issue_queue)
+
+    def test_report_explorer_includes_failed_engine_placeholders(self) -> None:
+        result = BenchmarkResult(
+            schema_version="5",
+            name="failed-engine",
+            timestamp="2026-07-27T00:00:00+00:00",
+            platform={"host": "test", "os": "test", "python": "test"},
+            engine_results=[
+                EngineResult(
+                    engine_path="/good",
+                    engine_name="openswmm",
+                    inp_path="complex/rtk.inp",
+                    inp_name="complex/rtk.inp",
+                    duration_s=1.0,
+                    peak_memory_mb=1.0,
+                    exit_code=0,
+                    rpt_path="/tmp/good.rpt",
+                    stdout="",
+                    stderr="",
+                    error=None,
+                    out_path="/tmp/good.out",
+                ),
+                EngineResult(
+                    engine_path="/bad",
+                    engine_name="runswmmrs",
+                    inp_path="complex/rtk.inp",
+                    inp_name="complex/rtk.inp",
+                    duration_s=None,
+                    peak_memory_mb=None,
+                    exit_code=1,
+                    rpt_path=None,
+                    stdout="",
+                    stderr="failed",
+                    error="failed",
+                    out_path=None,
+                ),
+            ],
+            output_comparisons=[],
+            comparisons=[
+                ModelComparison(
+                    inp_path="complex/rtk.inp",
+                    inp_name="complex/rtk.inp",
+                    engine_a="openswmm",
+                    engine_b="runswmmrs",
+                    overall_distance=1.0,
+                    section_comparisons=[
+                        SectionComparison(
+                            section_name="failed_table",
+                            distance=1.0,
+                            row_count_a=1,
+                            row_count_b=1,
+                            differences=[],
+                        )
+                    ],
+                )
+            ],
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output = Path(temporary_directory) / "report.html"
+            render_html(result, output)
+            html = output.read_text(encoding="utf-8")
+
+        self.assertIn("complex/rtk.inp", html)
+        self.assertIn("openswmm vs runswmmrs", html)
+        self.assertIn("Comparison cannot be made: runswmmrs model failed.", html)
+        self.assertIn("Placeholder comparisons: 1 report-table; 1 output", html)
+        self.assertIn('data-severity="failed"', html)
+        self.assertIn('class="graph-empty distance-failed"', html)
+        self.assertNotIn("failed_table", html)
+
+    def test_included_comparison_does_not_inherit_prior_placeholder(self) -> None:
+        def engine(name: str) -> EngineResult:
+            return EngineResult(
+                engine_path=f"/{name}",
+                engine_name=name,
+                inp_path="model.inp",
+                inp_name="model.inp",
+                duration_s=1.0,
+                peak_memory_mb=1.0,
+                exit_code=0,
+                rpt_path=f"/tmp/{name}.rpt",
+                stdout="",
+                stderr="",
+                error=None,
+                out_path=None,
+            )
+
+        result = BenchmarkResult(
+            schema_version="5",
+            name="placeholder-leak",
+            timestamp="2026-07-27T00:00:00+00:00",
+            platform={},
+            engine_results=[engine("a"), engine("b"), engine("c")],
+            comparisons=[
+                ModelComparison(
+                    inp_path="model.inp",
+                    inp_name="model.inp",
+                    engine_a="a",
+                    engine_b="b",
+                    overall_distance=0.001,
+                    section_comparisons=[],
+                ),
+                ModelComparison(
+                    inp_path="model.inp",
+                    inp_name="model.inp",
+                    engine_a="a",
+                    engine_b="c",
+                    overall_distance=0.07,
+                    section_comparisons=[
+                        SectionComparison(
+                            section_name="included_table",
+                            distance=0.07,
+                            row_count_a=1,
+                            row_count_b=1,
+                            differences=[],
+                        )
+                    ],
+                ),
+            ],
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output = Path(temporary_directory) / "report.html"
+            render_html(result, output)
+            html = output.read_text(encoding="utf-8")
+
+        self.assertIn("included_table", html)
+
+    def test_report_autoescapes_persisted_text_and_attributes(self) -> None:
+        result = BenchmarkResult(
+            schema_version="3",
+            name="<script>alert('name')</script>",
+            timestamp="2026-07-20T00:00:00+00:00",
+            platform={"host": "test", "os": "test", "python": "test"},
+            engine_results=[],
+            comparisons=[],
+            output_comparisons=[
+                OutputComparison(
+                    inp_path="model.inp",
+                    inp_name="<img src=x onerror=alert('model')>",
+                    engine_a='a" onmouseover="alert(1)',
+                    engine_b="b",
+                    overall_distance=0.5,
+                    section_comparisons=[],
+                    metric=OUTPUT_DISTANCE_METRIC_LEGACY,
+                )
+            ],
+        )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output = Path(temporary_directory) / "report.html"
+            render_html(result, output)
+            html = output.read_text(encoding="utf-8")
+
+        self.assertNotIn("<script>alert('name')</script>", html)
+        self.assertNotIn("<img src=x onerror=alert('model')>", html)
+        self.assertIn("&lt;script&gt;alert(&#39;name&#39;)&lt;/script&gt;", html)
+        self.assertIn("&lt;img src=x onerror=alert(&#39;model&#39;)&gt;", html)
+        self.assertIn(
+            'data-engine-a="a&#34; onmouseover=&#34;alert(1)"',
+            html,
+        )
+
+    def test_json_writer_rejects_nonfinite_values(self) -> None:
+        result = BenchmarkResult(
+            schema_version="3",
+            name="nonfinite",
+            timestamp="2026-07-20T00:00:00+00:00",
+            platform={"invalid": math.nan},
+            engine_results=[],
+            comparisons=[],
+        )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output = Path(temporary_directory) / "results.json"
+            with self.assertRaisesRegex(ValueError, "Out of range float values"):
+                save_json(result, output)
+
+    def test_legacy_output_comparison_renders_graphical_fallback(self) -> None:
+        result = BenchmarkResult(
+            schema_version="2",
+            name="legacy-output",
+            timestamp="2026-07-19T00:00:00+00:00",
+            platform={"host": "test", "os": "test", "python": "test"},
+            engine_results=[],
+            comparisons=[],
+            output_comparisons=[
+                OutputComparison(
+                    inp_path="model.inp",
+                    inp_name="model.inp",
+                    engine_a="a",
+                    engine_b="b",
+                    overall_distance=0.5,
+                    section_comparisons=[],
+                    metric=OUTPUT_DISTANCE_METRIC_LEGACY,
+                )
+            ],
+        )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output = Path(temporary_directory) / "report.html"
+            render_html(result, output)
+            html = output.read_text(encoding="utf-8")
+
+        self.assertNotIn(">Tabular</button>", html)
+        self.assertNotIn(">Graphical</button>", html)
+        self.assertIn("Graphical data was not retained for this result", html)
+        self.assertIn("Legacy pointwise relative distance", html)
+        self.assertIn(
+            "Near-zero values can therefore produce large relative scores", html
+        )
+        self.assertNotIn("Symmetric NRMSE + missing penalty", html)
+        self.assertNotIn('<script type="application/json"', html)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,63 @@
+[TITLE]
+Canonical EPA routing interface USE INFLOWS test
+
+[OPTIONS]
+FLOW_UNITS           CFS
+INFILTRATION         HORTON
+FLOW_ROUTING         DYNWAVE
+LINK_OFFSETS         DEPTH
+MIN_SLOPE            0
+ALLOW_PONDING        NO
+SKIP_STEADY_STATE    NO
+START_DATE           01/01/2020
+START_TIME           00:00:00
+REPORT_START_DATE    01/01/2020
+REPORT_START_TIME    00:00:00
+END_DATE             01/01/2020
+END_TIME             06:00:00
+SWEEP_START          01/01
+SWEEP_END            12/31
+DRY_DAYS             0
+REPORT_STEP          00:05:00
+WET_STEP             00:05:00
+DRY_STEP             01:00:00
+ROUTING_STEP         00:00:05
+RULE_STEP            00:00:00
+INERTIAL_DAMPING     PARTIAL
+NORMAL_FLOW_LIMITED  BOTH
+FORCE_MAIN_EQUATION  H-W
+VARIABLE_STEP        0.75
+LENGTHENING_STEP     0
+MIN_SURFAREA         0
+MAX_TRIALS           8
+HEAD_TOLERANCE       0.005
+SYS_FLOW_TOL         5
+LAT_FLOW_TOL         5
+MINIMUM_STEP         0.5
+THREADS              1
+
+[FILES]
+USE INFLOWS "inflows-interface.dat"
+
+[JUNCTIONS]
+;;Name             Elevation  MaxDepth   InitDepth  SurDepth   Aponded
+INTERFACE_NODE     95         10         0          0          0
+
+[OUTFALLS]
+;;Name             Elevation  Type       Stage Data       Gated    Route To
+DOWNSTREAM_OUTFALL 90         FREE                        NO
+
+[CONDUITS]
+;;Name             From Node       To Node             Length  Roughness  InOffset  OutOffset  InitFlow  MaxFlow
+DOWNSTREAM_PIPE    INTERFACE_NODE  DOWNSTREAM_OUTFALL  500     0.013      0         0          0         0
+
+[XSECTIONS]
+;;Link             Shape       Geom1      Geom2      Geom3      Geom4      Barrels
+DOWNSTREAM_PIPE    CIRCULAR    3          0          0          0          1
+
+[REPORT]
+INPUT              NO
+CONTROLS           NO
+SUBCATCHMENTS      NONE
+NODES              ALL
+LINKS              ALL

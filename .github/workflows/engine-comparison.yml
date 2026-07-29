@@ -1,0 +1,121 @@
+name: OpenSWMM versus EPA SWMM
+
+on:
+  workflow_dispatch:
+    inputs:
+      openswmm_ref:
+        description: OpenSWMM branch, tag, or commit
+        required: true
+        default: swmm6_rel
+        type: string
+      epa_ref:
+        description: EPA SWMM branch, tag, or commit
+        required: true
+        default: develop
+        type: string
+      run_name:
+        description: Name for the saved comparison results
+        required: true
+        default: openswmm-vs-epa
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+  VCPKG_REF: "2025.02.14"
+  OMP_NUM_THREADS: 1
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up swmm-bench
+        run: uv sync
+
+      - name: Clone OpenSWMM Engine
+        uses: actions/checkout@v4
+        with:
+          repository: HydroCouple/openswmm.engine
+          ref: ${{ inputs.openswmm_ref }}
+          path: openswmm
+
+      - name: Clone EPA SWMM
+        uses: actions/checkout@v4
+        with:
+          repository: USEPA/Stormwater-Management-Model
+          ref: ${{ inputs.epa_ref }}
+          path: epa-swmm
+
+      - name: Clone vcpkg
+        uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          ref: ${{ env.VCPKG_REF }}
+          path: vcpkg
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Bootstrap vcpkg
+        working-directory: vcpkg
+        run: ./bootstrap-vcpkg.sh -disableMetrics
+
+      - name: Build OpenSWMM Engine
+        working-directory: openswmm
+        run: |
+          cmake --preset Linux -B ../build/openswmm \
+            -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON \
+            -DOPENSWMM_BUILD_2D=OFF \
+            -DOPENSWMM_BUILD_GPU_PLUGIN=OFF \
+            -DOPENSWMM_WITH_HYPRE=OFF \
+            -DOPENSWMM_WITH_GEOPACKAGE=OFF \
+            -DOPENSWMM_BUILD_TESTS=OFF \
+            -DOPENSWMM_BUILD_UNIT_TESTS=OFF \
+            -DOPENSWMM_BUILD_REGRESSION_TESTS=OFF \
+            -DOPENSWMM_BUILD_BENCHMARKS=OFF
+          cmake --build ../build/openswmm --target openswmm
+
+      - name: Build EPA SWMM
+        run: |
+          cmake -S epa-swmm -B build/epa-swmm -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF
+          cmake --build build/epa-swmm --target runswmm
+          mv build/epa-swmm/src/run/runswmm build/epa-swmm/src/run/epaswmm
+
+      - name: Run regression suite
+        id: regression
+        continue-on-error: true
+        run: |
+          uv run swmm-test run --threads 1 --name "${{ inputs.run_name }}" \
+            build/openswmm/src/cli/openswmm \
+            build/epa-swmm/src/run/epaswmm
+
+      - name: Run benchmarks
+        run: |
+          uv run swmm-bench run --threads 1 --name "${{ inputs.run_name }}" \
+            build/openswmm/src/cli/openswmm \
+            build/epa-swmm/src/run/epaswmm
+
+      - name: Upload comparison results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.run_name }}-results
+          path: |
+            swmm-test-results/${{ inputs.run_name }}
+            swmm-bench-results/${{ inputs.run_name }}
+          if-no-files-found: warn
+
+      - name: Fail for regression errors
+        if: steps.regression.outcome == 'failure'
+        run: exit 1

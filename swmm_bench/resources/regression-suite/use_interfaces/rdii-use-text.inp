@@ -1,0 +1,52 @@
+[TITLE]
+Legacy text RDII interface routed through a junction and conduit.
+
+[OPTIONS]
+FLOW_UNITS           CFS
+INFILTRATION         HORTON
+FLOW_ROUTING         DYNWAVE
+LINK_OFFSETS         DEPTH
+START_DATE           01/01/2020
+START_TIME           00:00:00
+REPORT_START_DATE    01/01/2020
+REPORT_START_TIME    00:00:00
+END_DATE             01/01/2020
+END_TIME             01:00:00
+DRY_DAYS             0
+REPORT_STEP          00:05:00
+WET_STEP             00:05:00
+DRY_STEP             00:05:00
+ROUTING_STEP         00:00:05
+VARIABLE_STEP        0.75
+MIN_SURFAREA         12.566
+MAX_TRIALS           8
+HEAD_TOLERANCE       0.005
+THREADS              1
+
+[FILES]
+USE RDII "rdii-text-interface.dat"
+
+[JUNCTIONS]
+;;Name          Elevation  MaxDepth  InitDepth  SurDepth  Aponded
+INTERFACE_NODE  95         10        0          0         0
+
+[OUTFALLS]
+;;Name              Elevation  Type  Stage Data  Gated
+DOWNSTREAM_OUTFALL  90         FREE              NO
+
+[CONDUITS]
+;;Name           From Node       To Node             Length  Roughness  InOffset  OutOffset  InitFlow  MaxFlow
+DOWNSTREAM_PIPE  INTERFACE_NODE  DOWNSTREAM_OUTFALL  500     0.013      0         0          0         0
+
+[XSECTIONS]
+;;Link           Shape     Geom1  Geom2  Geom3  Geom4  Barrels
+DOWNSTREAM_PIPE  CIRCULAR  3      0      0      0      1
+
+[REPORT]
+INPUT          YES
+CONTINUITY     YES
+FLOWSTATS      YES
+CONTROLS       NO
+SUBCATCHMENTS  NONE
+NODES          ALL
+LINKS          ALL
