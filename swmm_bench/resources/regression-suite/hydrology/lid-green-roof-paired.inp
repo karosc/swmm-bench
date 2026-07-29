@@ -81,7 +81,7 @@ GR               DRAINMAT   4          0.5        0.1
 [LID_USAGE]
 ;;Subcatchment   LID Process      Number  Area       Width      InitSat    FromImp    ToPerv     RptFile                  DrainTo          FromPerv  
 ;;-------------- ---------------- ------- ---------- ---------- ---------- ---------- ---------- ------------------------ ---------------- ----------
-wGR              GR               100     50         10         0          25         1          "C:\Users\dickinre\Desktop\groof.txt" *                0               
+wGR              GR               100     50         10         0          25         1          "groof.txt" *                0               
 
 [OUTFALLS]
 ;;Name           Elevation  Type       Stage Data       Gated    Route To        

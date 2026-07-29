@@ -452,53 +452,22 @@ dependencies = [
 requires-dist = [
     { name = "jinja2", specifier = ">=3.1" },
     { name = "psutil", specifier = ">=5.9" },
-    { name = "swmm-pandas", directory = "../swmm-pandas" },
+    { name = "swmm-pandas", specifier = ">=0.14.0" },
     { name = "typer", extras = ["all"], specifier = ">=0.9" },
 ]
 
 [[package]]
 name = "swmm-pandas"
-version = "0.13.0"
-source = { directory = "../swmm-pandas" }
+version = "0.14.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "julian" },
     { name = "pandas" },
     { name = "swmm-toolkit" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "folium", marker = "extra == 'all'", specifier = ">=0.20.0" },
-    { name = "folium", marker = "extra == 'geo'", specifier = ">=0.20.0" },
-    { name = "geopandas", marker = "extra == 'all'", specifier = ">=1.0.1" },
-    { name = "geopandas", marker = "extra == 'geo'", specifier = ">=1.0.1" },
-    { name = "julian" },
-    { name = "networkx", marker = "extra == 'all'", specifier = ">=3.6.1" },
-    { name = "networkx", marker = "extra == 'graph'", specifier = ">=3.6.1" },
-    { name = "pandas", specifier = ">=2.1" },
-    { name = "pyarrow", marker = "extra == 'all'", specifier = ">=24.0.0" },
-    { name = "pyarrow", marker = "extra == 'parquet'", specifier = ">=24.0.0" },
-    { name = "swmm-toolkit", specifier = ">=0.16.0", index = "https://pypi.org/simple" },
-]
-provides-extras = ["geo", "graph", "parquet", "all"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "black", specifier = ">=25.11.0" },
-    { name = "coverage", specifier = ">=7.6.4" },
-    { name = "fsspec", specifier = ">=2024.0.0" },
-    { name = "furo", specifier = ">=2024.8.6" },
-    { name = "ipython", specifier = ">=8.18.1" },
-    { name = "matplotlib", specifier = ">=3.9.2" },
-    { name = "mypy", specifier = ">=1.13.0" },
-    { name = "myst-parser", specifier = ">=3.0.1" },
-    { name = "nbsphinx", specifier = ">=0.9.5" },
-    { name = "numpydoc", specifier = ">=1.8.0" },
-    { name = "pytest", specifier = ">=8.3.3" },
-    { name = "ruff", specifier = ">=0.7.1" },
-    { name = "sphinx", specifier = ">=7.4.7" },
-    { name = "sphinx-autobuild", specifier = ">=2024.10.3" },
-    { name = "types-pyyaml", specifier = ">=6.0.12.20250915" },
+sdist = { url = "https://files.pythonhosted.org/packages/66/72/9a615e98300103b5bdc4d88178190d70483f7e49adee0eae643274b71a26/swmm_pandas-0.14.0.tar.gz", hash = "sha256:3a05fceb6de33e0e009d3ecac21ca2984b244530871f3645fa57ec0094e95be2", size = 202866, upload-time = "2026-07-29T16:59:47.711Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/21/39/fb31fcf1fe9ddb4d5be68863b1b048fdd2e448ed961527d5e15b60eff80b/swmm_pandas-0.14.0-py3-none-any.whl", hash = "sha256:410449309be678146e986211cc3a0f237157d60381efd086e19849680ae47468", size = 207444, upload-time = "2026-07-29T16:59:46.143Z" },
 ]
 
 [[package]]
