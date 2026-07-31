@@ -10,61 +10,120 @@
   <style>
     :root {
       color-scheme: light;
-      --bg: #f5f7fb;
+      --bg: #edf4f8;
       --card: #ffffff;
-      --surface-muted: #f8fafc;
-      --text: #1f2937;
-      --muted: #6b7280;
-      --border: #dbe2ea;
-      --green: #d1fae5;
-      --yellow: #fef3c7;
-      --red: #fee2e2;
-      --green-text: #065f46;
-      --yellow-text: #92400e;
-      --red-text: #991b1b;
-      --failed: #ede9fe;
-      --failed-text: #5b21b6;
-      --accent: #2563eb;
-      --engine-a: #2563eb;
-      --engine-b: #c2410c;
+      --surface-muted: #f3f6f8;
+      --text: #10212b;
+      --muted: #53636c;
+      --border: #b8c8d0;
+      --channel: #0072b2;
+      --channel-soft: #d8eefb;
+      --sediment: #e69f00;
+      --sediment-soft: #fff0c2;
+      --clay: #d55e00;
+      --clay-soft: #ffe0c7;
+      --failure: #cc79a7;
+      --failure-soft: #f5d8ea;
+      --green: #d5f0e6;
+      --yellow: var(--sediment-soft);
+      --red: var(--clay-soft);
+      --green-text: #009e73;
+      --yellow-text: #a45b00;
+      --red-text: var(--clay);
+      --failed: var(--failure-soft);
+      --failed-text: #8b2f68;
+      --green-accent: #00c853;
+      --yellow-accent: #ffd400;
+      --red-accent: #ff4b00;
+      --failed-accent: #ff2f92;
+      --accent: var(--channel);
+      --accent-soft: var(--channel-soft);
+      --engine-a: var(--channel);
+      --engine-b: var(--clay);
+      --grid-soft: #ddebf2;
+      --grid: #bfd3dd;
+      --body-font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --data-font: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
+      font-family: var(--body-font);
       background: var(--bg);
       color: var(--text);
-      line-height: 1.5;
+      line-height: 1.45;
     }
     button, input, select { font: inherit; }
     .container {
-      max-width: 1800px;
+      max-width: 1680px;
       margin: 0 auto;
-      padding: 24px;
+      padding: 18px 24px 40px;
     }
     .card {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 20px;
-      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+      border-radius: 6px;
+      padding: 18px;
+      margin-bottom: 12px;
     }
-    h1, h2, h3 { margin-top: 0; }
+    h1, h2, h3 { margin: 0; line-height: 1.25; }
+    h1 { font-size: 24px; letter-spacing: -0.02em; }
+    h2 { font-size: 18px; }
+    h3 { font-size: 14px; }
+    p { margin: 8px 0; }
+    .report-header {
+      display: grid;
+      gap: 14px;
+    }
+    .report-title-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 10px 14px;
+    }
+    .report-mark {
+      color: var(--accent);
+      font-family: var(--data-font);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    .report-lede {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .report-triage {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 750;
+      letter-spacing: -0.03em;
+    }
+    .report-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 0;
+    }
+    .report-badges .pill {
+      border-width: 2px;
+      font-weight: 800;
+    }
     .meta-grid {
       display: grid;
-      gap: 12px;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      margin-top: 14px;
     }
     .meta-item {
-      padding: 12px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: #fafcff;
+      padding: 8px 0;
+      border-top: 1px solid var(--border);
+      background: transparent;
     }
     .meta-label {
       display: block;
-      font-size: 12px;
+      font-size: 10px;
       color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 0.08em;
@@ -75,41 +134,81 @@
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 12px;
-      font-size: 14px;
+      margin-top: 8px;
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+    }
+    code,
+    .explorer-item-title,
+    .issue-group-toggle,
+    .issue-row td:first-child,
+    .priority-table td:nth-child(3),
+    .priority-table td:nth-child(4),
+    .priority-table td:nth-child(5),
+    [data-model] > th,
+    [data-performance-index] strong,
+    .summary-stat strong,
+    .graph-score strong,
+    .series-name {
+      font-family: var(--data-font);
+      font-variant-numeric: tabular-nums;
     }
     th, td {
       border-bottom: 1px solid var(--border);
-      padding: 10px 12px;
+      padding: 8px 10px;
       text-align: left;
       vertical-align: top;
     }
     th {
       background: var(--surface-muted);
-      font-weight: 600;
+      font-size: 12px;
+      font-weight: 650;
     }
-    .distance-green { background: var(--green); color: var(--green-text); }
-    .distance-yellow { background: var(--yellow); color: var(--yellow-text); }
-    .distance-red { background: var(--red); color: var(--red-text); }
-    .distance-failed { background: var(--failed); color: var(--failed-text); }
+    .distance-green { background: var(--green); color: var(--green-text); border-color: var(--green-accent); }
+    .distance-yellow { background: var(--yellow); color: var(--yellow-text); border-color: var(--yellow-accent); }
+    .distance-red { background: var(--red); color: var(--red-text); border-color: var(--red-accent); }
+    .distance-failed { background: var(--failed); color: var(--failed-text); border-color: var(--failed-accent); }
+    tr.distance-green,
+    tr.distance-yellow,
+    tr.distance-red,
+    tr.distance-failed {
+      background: transparent;
+      color: var(--text);
+    }
+    tr.distance-green > *,
+    tr.distance-yellow > *,
+    tr.distance-red > *,
+    tr.distance-failed > * {
+      background: var(--card);
+      color: var(--text);
+    }
+    tr.distance-green > :first-child { border-left: 5px solid var(--green-accent); }
+    tr.distance-yellow > :first-child { border-left: 5px solid var(--yellow-accent); }
+    tr.distance-red > :first-child { border-left: 5px solid var(--red-accent); }
+    tr.distance-failed > :first-child { border-left: 5px solid var(--failed-accent); }
     .pill {
       display: inline-block;
-      padding: 2px 8px;
+      padding: 1px 6px;
+      border: 1px solid currentColor;
       border-radius: 999px;
-      font-size: 12px;
-      font-weight: 600;
+      font-size: 11px;
+      font-weight: 650;
     }
+    .pill.distance-green { border-color: var(--green-accent); }
+    .pill.distance-yellow { border-color: var(--yellow-accent); }
+    .pill.distance-red { border-color: var(--red-accent); }
+    .pill.distance-failed { border-color: var(--failed-accent); }
     .warning-badge { background: var(--yellow); color: var(--yellow-text); }
     .explorer-item[data-has-warnings="true"] {
-      border-color: #f59e0b;
-      background: #fffaf0;
+      border-color: var(--sediment);
+      background: var(--sediment-soft);
     }
     details {
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px 16px;
-      margin-top: 12px;
-      background: #fcfdff;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-top: 10px;
+      background: var(--card);
     }
     summary {
       cursor: pointer;
@@ -141,37 +240,35 @@
     }
     .section-nav {
       position: sticky;
-      top: 12px;
+      top: 8px;
       z-index: 2;
       display: flex;
-      gap: 8px;
-      margin: -8px 0 20px;
-      padding: 8px;
+      gap: 2px;
+      margin: 0 0 12px;
+      padding: 4px;
       overflow-x: auto;
       border: 1px solid var(--border);
-      border-radius: 10px;
-      background: rgba(248, 250, 252, 0.96);
-      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.96);
     }
     .section-nav a {
       flex: 0 0 auto;
-      border: 1px solid transparent;
-      border-radius: 7px;
-      padding: 6px 9px;
+      border-radius: 4px;
+      padding: 5px 8px;
       color: var(--text);
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       text-decoration: none;
     }
     .section-nav a:hover {
-      border-color: var(--border);
       color: var(--accent);
-      background: var(--card);
+      background: var(--accent-soft);
     }
     .section-nav .count {
-      margin-left: 4px;
+      margin-left: 3px;
       color: var(--muted);
-      font-size: 12px;
+      font-size: 11px;
+      font-weight: 500;
     }
     .card[id] { scroll-margin-top: 72px; }
     .summary-head {
@@ -182,114 +279,169 @@
     }
     .summary-grid {
       display: grid;
-      gap: 12px;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       margin-top: 12px;
     }
     .summary-stat strong {
       display: block;
-      font-size: 28px;
+      font-size: 21px;
       line-height: 1.2;
+      letter-spacing: -0.04em;
     }
-    .priority-heading { margin: 18px 0 4px; }
+    .priority-heading { margin-top: 18px; }
     .priority-table td:last-child { white-space: nowrap; }
     .issue-controls {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 8px;
-      margin: 12px 0 8px;
-    }
-    .issue-controls label,
-    .issue-filter {
-      min-width: 0;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 6px;
+      margin-top: 8px;
     }
     .issue-controls label {
+      min-width: 0;
       color: var(--muted);
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
     }
+    .performance-card {
+      display: grid;
+      gap: 12px;
+    }
+    .performance-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px 16px;
+    }
+    .performance-head .meta-label {
+      display: inline;
+      margin-left: 8px;
+    }
+    #runtimeChart { max-height: 220px; }
     .issue-filter {
       width: 100%;
-      margin-top: 4px;
+      min-width: 0;
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 10px;
+      border-radius: 5px;
+      padding: 6px 8px;
       background: var(--card);
       color: var(--text);
-      font: inherit;
+      font-size: 12px;
     }
     .issue-chips {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      margin: 8px 0;
+      gap: 2px;
+      margin: 0;
     }
     .issue-chip,
     .issue-group-toggle {
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 6px 9px;
-      background: var(--card);
-      color: var(--text);
+      border: 0;
+      border-radius: 999px;
+      padding: 4px 8px;
+      background: transparent;
+      color: var(--muted);
       cursor: pointer;
-      font: inherit;
+      font-size: 12px;
     }
     .issue-chip[aria-pressed="true"],
     .issue-group-toggle:hover {
-      border-color: var(--accent);
-      background: #eff6ff;
+      background: var(--accent-soft);
       color: var(--accent);
     }
     .issue-group-row th,
-    .issue-group-row td {
+    .issue-group-row td,
+    tr.issue-group-row.distance-green > *,
+    tr.issue-group-row.distance-yellow > *,
+    tr.issue-group-row.distance-red > *,
+    tr.issue-group-row.distance-failed > * {
       background: var(--surface-muted);
       font-weight: 600;
     }
     [data-issue-group][data-collapsed="true"] .issue-row { display: none; }
     .issue-row td:first-child { color: var(--muted); }
-    .issue-evidence summary { cursor: pointer; }
-    .issue-evidence ul { margin: 8px 0 0; padding-left: 18px; }
-    .issue-summary { margin: 12px 0; }
-    .issue-summary-filter {
-      width: 100%;
-      cursor: pointer;
-      color: var(--text);
-      font: inherit;
-      text-align: left;
-    }
-    .issue-summary-filter:hover,
-    .issue-summary-filter[aria-pressed="true"] {
-      border-color: var(--accent);
-      background: #eff6ff;
-    }
     .issue-toolbar {
       position: sticky;
-      top: 72px;
+      top: 50px;
       z-index: 1;
-      margin: 12px 0;
-      padding: 12px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: rgba(248, 250, 252, 0.96);
-      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+      margin: 10px 0;
+      padding: 8px 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.96);
     }
+    .issue-quick-controls,
     .issue-actions {
       display: flex;
       flex-wrap: wrap;
-      justify-content: space-between;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
+    .issue-search { flex: 1 1 220px; max-width: 340px; }
+    .issue-actions { margin-left: auto; }
+    .issue-status { margin: 0 6px 0 0; font-size: 12px; }
     .issue-action {
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 6px 9px;
-      background: var(--card);
-      color: var(--text);
+      border: 0;
+      border-radius: 4px;
+      padding: 4px 6px;
+      background: transparent;
+      color: var(--muted);
       cursor: pointer;
-      font: inherit;
+      font-size: 12px;
     }
-    .issue-action:hover { border-color: var(--accent); color: var(--accent); }
+    .issue-action:hover { color: var(--accent); background: var(--accent-soft); }
+    .tool-row,
+    .toggle-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      margin: 8px 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .tool-button {
+      border: 0;
+      border-radius: 4px;
+      padding: 4px 6px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .tool-button:hover {
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+    .sort-button[data-sort-direction="asc"]::after { content: " ↑"; color: var(--accent); }
+    .sort-button[data-sort-direction="desc"]::after { content: " ↓"; color: var(--accent); }
+    .issue-filters {
+      margin-top: 6px;
+      padding: 0;
+      border: 0;
+    }
+    .issue-filters > summary { color: var(--muted); font-size: 12px; }
+    .severity-key {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 16px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .severity-key span { white-space: nowrap; }
+    .status-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      margin-right: 5px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .severity-failed { color: var(--failed-accent); }
+    .severity-high { color: var(--red-accent); }
+    .severity-review { color: var(--yellow-accent); }
     .compact-details {
       margin-top: 0;
       background: var(--card);
@@ -318,18 +470,18 @@
     }
     .comparison-explorer {
       display: grid;
-      grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
-      gap: 16px;
-      margin-top: 12px;
+      grid-template-columns: minmax(260px, 310px) minmax(0, 1fr);
+      gap: 12px;
+      margin-top: 10px;
       align-items: stretch;
-      height: calc(100vh - 220px);
-      min-height: 520px;
+      height: calc(100vh - 180px);
+      min-height: 480px;
     }
     .explorer-sidebar {
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 6px;
       background: var(--surface-muted);
-      padding: 12px;
+      padding: 8px;
       min-width: 0;
       min-height: 0;
       display: flex;
@@ -338,27 +490,28 @@
     }
     .explorer-controls {
       display: grid;
-      gap: 8px;
-      margin-bottom: 10px;
+      gap: 6px;
+      margin-bottom: 8px;
     }
     .explorer-controls label {
       display: block;
-      margin-bottom: 4px;
-      font-size: 12px;
+      margin-bottom: 2px;
+      font-size: 10px;
       font-weight: 600;
       color: var(--muted);
     }
     .explorer-filter {
       width: 100%;
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 10px;
+      border-radius: 5px;
+      padding: 6px 8px;
       background: var(--card);
       color: var(--text);
+      font-size: 12px;
     }
     .explorer-list {
       display: grid;
-      gap: 8px;
+      gap: 2px;
       align-content: start;
       flex: 1 1 auto;
       margin: 0;
@@ -374,37 +527,40 @@
     }
     .explorer-item {
       width: 100%;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px;
-      background: var(--card);
+      border: 1px solid transparent;
+      border-radius: 4px;
+      padding: 8px;
+      background: transparent;
       color: var(--text);
       text-align: left;
       cursor: pointer;
     }
-    .explorer-item:hover { border-color: var(--accent); }
+    .explorer-item:hover { background: var(--card); }
     .explorer-item[aria-pressed="true"] {
-      border-color: var(--accent);
-      box-shadow: inset 3px 0 0 var(--accent);
-      background: #f8fbff;
+      border-color: var(--border);
+      background: var(--card);
     }
+    .explorer-item[data-severity="green"] { box-shadow: inset 4px 0 0 var(--green-accent); }
+    .explorer-item[data-severity="yellow"] { box-shadow: inset 4px 0 0 var(--yellow-accent); }
+    .explorer-item[data-severity="red"] { box-shadow: inset 4px 0 0 var(--red-accent); }
+    .explorer-item[data-severity="failed"] { box-shadow: inset 4px 0 0 var(--failed-accent); }
     .explorer-item-title,
     .explorer-item-meta {
       display: block;
       overflow-wrap: anywhere;
     }
-    .explorer-item-title { font-weight: 600; }
-    .explorer-item-meta { color: var(--muted); font-size: 13px; }
+    .explorer-item-title { font-size: 13px; font-weight: 700; letter-spacing: -0.02em; }
+    .explorer-item-meta { color: var(--muted); font-size: 11px; }
     .explorer-panel {
       border: 1px solid var(--border);
-      border-radius: 10px;
-      background: #fcfdff;
-      padding: 14px 16px;
+      border-radius: 6px;
+      background: var(--card);
+      padding: 12px;
       min-width: 0;
       flex: 1 1 auto;
       overflow: auto;
     }
-    .explorer-panel h3 { margin-bottom: 4px; }
+    .explorer-panel h3 { margin-bottom: 3px; }
     .explorer-panel > .table-scroll,
     .explorer-panel .tab-panel > .table-scroll {
       max-height: calc(100vh - 320px);
@@ -423,7 +579,7 @@
     .explorer-filter:focus-visible,
     .issue-filter:focus-visible,
     .issue-chip:focus-visible,
-    .issue-summary-filter:focus-visible,
+    .issue-filters > summary:focus-visible,
     .issue-action:focus-visible,
     .issue-group-toggle:focus-visible,
     .chart-reset:focus-visible,
@@ -532,7 +688,7 @@
       padding: 10px 12px;
       background: var(--surface-muted);
     }
-    .graph-score strong { display: block; font-size: 18px; }
+    .graph-score strong { display: block; font-size: 18px; letter-spacing: -0.03em; }
     .chart-toolbar {
       display: flex;
       align-items: center;
@@ -551,7 +707,7 @@
       cursor: pointer;
       font-weight: 600;
     }
-    .chart-reset:hover:not(:disabled) { background: #eff6ff; }
+    .chart-reset:hover:not(:disabled) { background: var(--accent-soft); }
     .chart-reset:disabled {
       border-color: var(--border);
       color: var(--muted);
@@ -576,21 +732,90 @@
       color: var(--muted);
       text-align: center;
     }
+    .graph-empty strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--text);
+      font-size: 16px;
+    }
+    .graph-empty p { margin: 4px 0; }
+    .failure-checklist {
+      display: inline-grid;
+      gap: 3px;
+      margin: 12px auto 0;
+      padding-left: 18px;
+      text-align: left;
+    }
     @media (max-width: 800px) {
-      .container { padding: 12px; }
+      .container { padding: 10px; }
       .card { padding: 14px; }
+      .issue-controls { grid-template-columns: 1fr 1fr; }
+      .issue-actions { margin-left: 0; }
       .graph-layout { grid-template-columns: 1fr; }
       .comparison-explorer { grid-template-columns: 1fr; height: auto; }
       .series-list { max-height: 280px; }
       .graph-score-grid { grid-template-columns: 1fr; }
       .graph-heading-row { display: block; }
       .chart-toolbar { align-items: flex-start; flex-direction: column; }
+      .issue-queue {
+        max-height: none;
+        overflow: visible;
+      }
+      .priority-table {
+        border-collapse: separate;
+        border-spacing: 0 10px;
+      }
+      .priority-table thead { display: none; }
+      .priority-table tbody {
+        display: block;
+        margin-bottom: 10px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--card);
+      }
+      .priority-table tr,
+      .priority-table th,
+      .priority-table td {
+        display: block;
+        width: 100%;
+      }
+      .priority-table tr { border-bottom: 1px solid var(--border); }
+      .priority-table tr:last-child { border-bottom: 0; }
+      .priority-table th,
+      .priority-table td {
+        border-bottom: 0;
+        padding: 8px 10px;
+      }
+      .priority-table th::before,
+      .priority-table td::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 2px;
+        color: var(--muted);
+        font-family: var(--body-font);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .priority-table th[data-label="Model"]::before { content: ""; margin: 0; }
     }
   </style>
 </head>
+{% macro severity_label(value) -%}
+  {{ "Failed" if value == "failed" else "High" if value == "red" else "Review" if value == "yellow" else "Match" }}
+{%- endmacro %}
 {% macro render_section_table(comparison, item_label) %}
   <div class="table-scroll">
-    <table>
+    <div class="tool-row" data-section-table-tools>
+      <label class="toggle-row">
+        <input type="checkbox" data-section-only-differences>
+        Only tables with differences
+      </label>
+      <button class="tool-button" type="button" data-section-sort-distance>Sort by largest distance</button>
+    </div>
+    <table data-section-table>
       <thead>
         <tr>
           <th>{{ item_label }}</th>
@@ -603,7 +828,7 @@
       <tbody>
         {% for section in comparison.section_comparisons %}
         {% set section_class = section.distance | distance_class %}
-        <tr class="distance-{{ section_class }}">
+        <tr class="distance-{{ section_class }}" data-section-distance="{{ section.distance }}" data-has-differences="{{ 'true' if section.difference_count or section.differences else 'false' }}">
           <td>{{ section.section_name }}{% if section.note %} <span class="pill warning-badge">missing table</span>{% endif %}</td>
           <td>{{ '%.6f'|format(section.distance) }}</td>
           <td>{{ section.row_count_a }}</td>
@@ -613,6 +838,9 @@
               <div class="muted">{{ section.difference_count }} differing cells{% if section.differences_truncated %}; retained details are capped at {{ section.differences|length }}, with the first {{ 10 if section.differences|length > 10 else section.differences|length }} shown below{% endif %}.</div>
             {% endif %}
             {% if section.differences %}
+              <div class="tool-row">
+                <button class="tool-button" type="button" data-copy-table-name="{{ section.section_name }}">Copy table name</button>
+              </div>
               <div class="table-scroll">
                 <table>
                   <thead>
@@ -664,10 +892,10 @@
           <label>Severity
             <select class="explorer-filter" data-explorer-severity>
               <option value="">All severities</option>
-              <option value="red">Red</option>
-              <option value="yellow">Yellow</option>
-              <option value="green">Green</option>
-              <option value="failed">Failed</option>
+              <option value="red">High difference (&gt;10%)</option>
+              <option value="yellow">Review (1–10%)</option>
+              <option value="green">Match (≤1%)</option>
+              <option value="failed">Failed comparison</option>
             </select>
           </label>
           <label>Engine pair
@@ -681,6 +909,10 @@
           <label>Maximum distance
             <input class="explorer-filter" type="number" min="0" step="any" placeholder="No maximum" data-explorer-max-distance>
           </label>
+          <label class="toggle-row">
+            <input type="checkbox" data-explorer-show-matches>
+            Show matching comparisons
+          </label>
         </div>
         <p class="muted" data-explorer-status></p>
         <ul class="explorer-list" aria-label="{{ title }} comparison list">
@@ -690,9 +922,9 @@
           {% set panel_id = item.dom_id %}
           <li>
             <button class="explorer-item" type="button" data-explorer-item data-panel-id="{{ panel_id }}" data-search="{{ comparison.inp_name }} {{ comparison.engine_a }} {{ comparison.engine_b }}" data-severity="{{ klass }}" data-engine-pair="{{ comparison.engine_a }} vs {{ comparison.engine_b }}" data-distance="{{ comparison.overall_distance }}" data-has-warnings="{{ 'true' if comparison.report_warnings or comparison.report_errors else 'false' }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">
-              <span class="series-item-top"><span class="series-type">{{ klass }}</span><span class="pill distance-{{ klass }}">{{ '%.6f'|format(comparison.overall_distance) }}</span></span>
+              <span class="series-item-top"><span class="series-type">{{ severity_label(klass) }}</span><span class="pill distance-{{ klass }}">{{ '%.6f'|format(comparison.overall_distance) }}</span></span>
               <span class="explorer-item-title">{{ comparison.inp_name }}</span>
-              <span class="explorer-item-meta">{{ comparison.engine_a }} vs {{ comparison.engine_b }}{% if item.placeholder_reason %} · placeholder{% elif comparison.report_warnings %} · {{ comparison.report_warnings|length }} table warning{{ "s" if comparison.report_warnings|length != 1 else "" }}{% endif %}</span>
+              <span class="explorer-item-meta">{{ comparison.engine_a }} vs {{ comparison.engine_b }}{% if item.placeholder_reason %} · not comparable{% elif comparison.report_warnings %} · {{ comparison.report_warnings|length }} table warning{{ "s" if comparison.report_warnings|length != 1 else "" }}{% endif %}</span>
             </button>
           </li>
           {% endfor %}
@@ -705,9 +937,18 @@
         {% set panel_id = item.dom_id %}
         <section class="explorer-panel" data-explorer-panel="{{ panel_id }}" {% if not loop.first %}hidden{% endif %}>
           <h3>{{ comparison.inp_name }}</h3>
-          <p class="muted">{{ comparison.engine_a }} vs {{ comparison.engine_b }} · overall distance <span class="pill distance-{{ klass }}">{{ '%.6f'|format(comparison.overall_distance) }}</span>{% if item.placeholder_reason %} <span class="pill distance-{{ klass }}">{{ "failed" if klass == "failed" else "placeholder" }}</span>{% elif comparison.report_errors %} <span class="pill distance-failed">{{ comparison.report_errors|length }} error{{ "s" if comparison.report_errors|length != 1 else "" }}</span>{% elif comparison.report_warnings %} <span class="pill warning-badge">{{ comparison.report_warnings|length }} warning{{ "s" if comparison.report_warnings|length != 1 else "" }}</span>{% endif %}</p>
+          <p class="muted">{{ comparison.engine_a }} vs {{ comparison.engine_b }} · overall distance <span class="pill distance-{{ klass }}">{{ '%.6f'|format(comparison.overall_distance) }}</span>{% if item.placeholder_reason %} <span class="pill distance-{{ klass }}">{{ "failed" if klass == "failed" else "not comparable" }}</span>{% elif comparison.report_errors %} <span class="pill distance-failed">{{ comparison.report_errors|length }} error{{ "s" if comparison.report_errors|length != 1 else "" }}</span>{% elif comparison.report_warnings %} <span class="pill warning-badge">{{ comparison.report_warnings|length }} warning{{ "s" if comparison.report_warnings|length != 1 else "" }}</span>{% endif %}</p>
           {% if item.placeholder_reason %}
-          <div class="graph-empty{% if klass == 'failed' %} distance-failed{% endif %}">{{ item.placeholder_reason }}</div>
+          <div class="graph-empty{% if klass == 'failed' %} distance-failed{% endif %}">
+            <strong>{{ "Not comparable" if klass == "failed" else "Hidden as matching" }}</strong>
+            <p>{{ item.placeholder_reason }}</p>
+            {% if klass == "failed" %}
+            <ul class="failure-checklist">
+              <li>Check the engine exit code.</li>
+              <li>Open the retained stderr, report, and output artifacts.</li>
+            </ul>
+            {% endif %}
+          </div>
           {% endif %}
           {% if item.diagnostic_rows %}
           <div class="table-scroll">
@@ -754,10 +995,10 @@
           <label>Severity
             <select class="explorer-filter" data-explorer-severity>
               <option value="">All severities</option>
-              <option value="red">Red</option>
-              <option value="yellow">Yellow</option>
-              <option value="green">Green</option>
-              <option value="failed">Failed</option>
+              <option value="red">High difference (&gt;10%)</option>
+              <option value="yellow">Review (1–10%)</option>
+              <option value="green">Match (≤1%)</option>
+              <option value="failed">Failed comparison</option>
             </select>
           </label>
           <label>Engine pair
@@ -771,6 +1012,10 @@
           <label>Maximum distance
             <input class="explorer-filter" type="number" min="0" step="any" placeholder="No maximum" data-explorer-max-distance>
           </label>
+          <label class="toggle-row">
+            <input type="checkbox" data-explorer-show-matches>
+            Show matching comparisons
+          </label>
         </div>
         <p class="muted" data-explorer-status></p>
         <ul class="explorer-list" aria-label="{{ title }} comparison list">
@@ -779,9 +1024,9 @@
           {% set klass = item.severity %}
           <li>
             <button class="explorer-item" type="button" data-explorer-item data-panel-id="{{ item.dom_id }}" data-search="{{ comparison.inp_name }} {{ comparison.engine_a }} {{ comparison.engine_b }} {{ item.metric_info.short_label }}" data-severity="{{ klass }}" data-engine-pair="{{ comparison.engine_a }} vs {{ comparison.engine_b }}" data-distance="{{ comparison.overall_distance }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">
-              <span class="series-item-top"><span class="series-type">{{ klass }}</span><span class="pill distance-{{ klass }}">{{ '%.6f'|format(comparison.overall_distance) }}</span></span>
+              <span class="series-item-top"><span class="series-type">{{ severity_label(klass) }}</span><span class="pill distance-{{ klass }}">{{ '%.6f'|format(comparison.overall_distance) }}</span></span>
               <span class="explorer-item-title">{{ comparison.inp_name }}</span>
-              <span class="explorer-item-meta">{{ comparison.engine_a }} vs {{ comparison.engine_b }} · {{ item.metric_info.short_label }}{% if item.placeholder_reason %} · placeholder{% elif item.graphical_series %} · {{ item.graphical_series|length }} graph series{% else %} · graph unavailable{% endif %}</span>
+              <span class="explorer-item-meta">{{ comparison.engine_a }} vs {{ comparison.engine_b }} · {{ item.metric_info.short_label }}{% if item.placeholder_reason %} · not comparable{% elif item.graphical_series %} · {{ item.graphical_series|length }} plotted series{% else %} · no plotted series{% endif %}</span>
             </button>
           </li>
           {% endfor %}
@@ -794,9 +1039,23 @@
         <section class="explorer-panel" data-explorer-panel="{{ item.dom_id }}" {% if not loop.first %}hidden{% endif %}>
           <div class="output-comparison" data-output-comparison data-engine-a="{{ comparison.engine_a }}" data-engine-b="{{ comparison.engine_b }}">
             <h3>{{ comparison.inp_name }}</h3>
-            <p class="muted">{{ comparison.engine_a }} vs {{ comparison.engine_b }} · {{ item.metric_info.short_label }} · overall distance <span class="pill distance-{{ klass }}">{{ '%.6f'|format(comparison.overall_distance) }}</span>{% if item.placeholder_reason %} <span class="pill distance-{{ klass }}">{{ "failed" if klass == "failed" else "placeholder" }}</span>{% elif not item.details_retained %} <span class="pill distance-{{ klass }}">summary only</span>{% elif item.graphical_series %} · graphical view loads on click{% endif %}</p>
+            <p class="muted">{{ comparison.engine_a }} vs {{ comparison.engine_b }} · {{ item.metric_info.short_label }} · overall distance <span class="pill distance-{{ klass }}">{{ '%.6f'|format(comparison.overall_distance) }}</span>{% if item.placeholder_reason %} <span class="pill distance-{{ klass }}">{{ "failed" if klass == "failed" else "not comparable" }}</span>{% elif not item.details_retained %} <span class="pill distance-{{ klass }}">summary only</span>{% elif item.graphical_series %} · {{ item.graphical_series|length }} plotted series{% endif %}</p>
             {% if item.placeholder_reason or not item.details_retained %}
-            <div class="graph-empty">{{ item.placeholder_reason or "Detailed output comparison data was not retained." }}</div>
+            <div class="graph-empty{% if item.placeholder_reason and klass == 'failed' %} distance-failed{% endif %}">
+              {% if item.placeholder_reason %}
+              <strong>{{ "Not comparable" if klass == "failed" else "Hidden as matching" }}</strong>
+              <p>{{ item.placeholder_reason }}</p>
+              {% if klass == "failed" %}
+              <ul class="failure-checklist">
+                <li>Check the engine exit code.</li>
+                <li>Open the retained stderr, report, and output artifacts.</li>
+              </ul>
+              {% endif %}
+              {% else %}
+              <strong>Summary only</strong>
+              <p>Detailed output comparison data was not saved.</p>
+              {% endif %}
+            </div>
             {% else %}
             <details class="metric-help">
               <summary><span class="info-icon" aria-hidden="true">ⓘ</span> About output distance — {{ item.metric_info.label }}</summary>
@@ -882,7 +1141,7 @@
               </div>
               <script type="application/json" id="{{ item.dom_id }}-data" data-output-series-data>{{ item.graphical_series | tojson }}</script>
             {% else %}
-              <div class="graph-empty">{{ item.graphical_unavailable_reason or "Graphical data was not retained for this result." }}</div>
+              <div class="graph-empty">{{ item.graphical_unavailable_reason or "No time-series samples were saved for this comparison." }}</div>
             {% endif %}
             {% endif %}
           </div>
@@ -897,94 +1156,105 @@
 {% endmacro %}
 <body>
   <div class="container">
-    <section class="card">
-      <h1>{{ "swmm-test interface report" if interface_groups else "swmm-bench report" }}</h1>
-      <p class="muted">{{ "Interface run" if interface_groups else "Benchmark" }} <strong>{{ result.name }}</strong> captured at {{ result.timestamp }}</p>
+    <header class="card report-header">
+      <div class="report-title-row">
+        <span class="report-mark">{{ "SWMM TEST" if result.interface_families else "SWMM BENCH" }}</span>
+        <h1>{{ "swmm-test interface report" if result.interface_families else "swmm-bench comparison report" }}</h1>
+      </div>
+      <p class="report-lede">{{ "Interface run" if interface_groups else "Benchmark" }} <strong>{{ result.name }}</strong> · {{ result.timestamp }}</p>
+      {% if not interface_groups %}
+      <p class="report-triage">{{ issue_counts.total }} issue{{ "s" if issue_counts.total != 1 else "" }} across {{ issue_groups|length }} model{{ "s" if issue_groups|length != 1 else "" }}</p>
+      <p class="report-badges" aria-label="Issue counts">
+        <span class="pill distance-failed">Failed {{ issue_counts.failed }}</span>
+        <span class="pill distance-red">High {{ issue_counts.red }}</span>
+        <span class="pill distance-yellow">Review {{ issue_counts.yellow }}</span>
+        <span class="pill distance-green">Hidden as matching {{ excluded_report_comparison_count + excluded_output_comparison_count }}</span>
+      </p>
+      {% endif %}
       <div class="meta-grid">
         <div class="meta-item"><span class="meta-label">Host</span>{{ result.platform.host }}</div>
         <div class="meta-item"><span class="meta-label">Operating system</span>{{ result.platform.os }}</div>
         <div class="meta-item"><span class="meta-label">Python</span>{{ result.platform.python }}</div>
-        <div class="meta-item"><span class="meta-label">Schema version</span>{{ result.schema_version }}</div>
+        <div class="meta-item"><span class="meta-label">Schema</span>{{ result.schema_version }}</div>
       </div>
-    </section>
+    </header>
 
     {% if not interface_groups %}
     <nav class="section-nav" aria-label="Report sections">
       <a href="#overview">Overview</a>
-      <a href="#performance">Performance</a>
       <a href="#report-comparison-explorer">Report <span class="count">{{ comparison_rows|length }}</span></a>
       <a href="#output-comparison-explorer">Output <span class="count">{{ output_drilldowns|length }}</span></a>
+      <a href="#performance">Performance</a>
     </nav>
     {% endif %}
 
     <section class="card" id="overview" aria-labelledby="disagreement-overview">
       <div class="summary-head">
         <div>
-          <h2 id="disagreement-overview">Disagreement overview</h2>
-          <p class="muted">Every comparison pair is searchable below. Pairs below {{ '%.0f'|format(comparison_exclusion_threshold * 100) }}% or without completed engine output show a placeholder instead of graphical data. Graph JSON is parsed only after opening a comparison.</p>
+          <h2 id="disagreement-overview">Comparison overview</h2>
+          <p class="muted">Start with exceptions, then open the report tables or output series that need inspection.</p>
         </div>
       </div>
       <div class="summary-grid">
-        <div class="meta-item summary-stat"><span class="meta-label">Output pairs to inspect</span><strong>{{ output_drilldowns|length }}</strong><span class="muted">{{ excluded_output_comparison_count }} placeholders</span></div>
-        <div class="meta-item summary-stat"><span class="meta-label">Report-table pairs to inspect</span><strong>{{ comparison_rows|length }}</strong><span class="muted">{{ excluded_report_comparison_count }} placeholders</span></div>
-        <div class="meta-item summary-stat"><span class="meta-label">Report diagnostics</span><strong>{{ report_error_count }} errors</strong><span class="muted">{{ report_warning_count }} warnings</span></div>
-        <div class="meta-item summary-stat"><span class="meta-label">Run size</span><strong>{{ engines|length }} × {{ models|length }}</strong><span class="muted">engines by models</span></div>
+        <div class="meta-item summary-stat"><span class="meta-label">Output comparisons</span><strong>{{ output_drilldowns|length }}</strong><span class="muted">{{ excluded_output_comparison_count }} hidden as matching</span></div>
+        <div class="meta-item summary-stat"><span class="meta-label">Report comparisons</span><strong>{{ comparison_rows|length }}</strong><span class="muted">{{ excluded_report_comparison_count }} hidden as matching</span></div>
+        <div class="meta-item summary-stat"><span class="meta-label">Diagnostics</span><strong>{{ report_error_count }} errors</strong><span class="muted">{{ report_warning_count }} warnings</span></div>
+        <div class="meta-item summary-stat"><span class="meta-label">Run matrix</span><strong>{{ engines|length }} × {{ models|length }}</strong><span class="muted">engines × models</span></div>
       </div>
       {% if issue_groups %}
-      <h3 class="priority-heading">Issue queue</h3>
-      <p class="muted">Ranked report and output disagreements. Expand a model for evidence, then open the existing detail view.</p>
+      <h3 class="priority-heading">Issues</h3>
+      <p class="severity-key" aria-label="Severity scale">
+        <span><i class="status-dot severity-failed"></i><strong>Failed</strong> run or report error</span>
+        <span><i class="status-dot severity-high"></i><strong>High</strong> &gt;10% difference</span>
+        <span><i class="status-dot severity-review"></i><strong>Review</strong> 1–10% difference</span>
+      </p>
       <div data-issue-queue-container>
-        <div class="summary-grid issue-summary" aria-label="Issue queue filters">
-          <button class="meta-item summary-stat issue-summary-filter" type="button" data-issue-chip="" aria-pressed="true"><span class="meta-label">All issues</span><strong>{{ issue_counts.total }}</strong><span class="muted">Show every issue</span></button>
-          <button class="meta-item summary-stat issue-summary-filter" type="button" data-issue-chip="failed" aria-pressed="false"><span class="meta-label">Failed issues</span><strong>{{ issue_counts.failed }}</strong><span class="muted">Requires investigation</span></button>
-          <button class="meta-item summary-stat issue-summary-filter" type="button" data-issue-chip="red" aria-pressed="false"><span class="meta-label">Red issues</span><strong>{{ issue_counts.red }}</strong><span class="muted">Large disagreement</span></button>
-          <button class="meta-item summary-stat issue-summary-filter" type="button" data-issue-chip="yellow" aria-pressed="false"><span class="meta-label">Yellow issues</span><strong>{{ issue_counts.yellow }}</strong><span class="muted">Moderate disagreement</span></button>
-        </div>
         <div class="issue-toolbar">
-          <div class="issue-controls">
-            <label>Search model or engine
-              <input class="issue-filter" type="search" placeholder="Filter issues" data-issue-search>
-            </label>
-            <label>Kind
-              <select class="issue-filter" data-issue-kind>
-                <option value="">All kinds</option>
-                <option value="Report">Report</option>
-                <option value="Output">Output</option>
-              </select>
-            </label>
-            <label>Severity
-              <select class="issue-filter" data-issue-severity>
-                <option value="">All severities</option>
-                <option value="failed">Failed</option>
-                <option value="red">Red</option>
-                <option value="yellow">Yellow</option>
-              </select>
-            </label>
-            <label>Engine pair
-              <select class="issue-filter" data-issue-engine-pair>
-                <option value="">All engine pairs</option>
-              </select>
-            </label>
-            <label>Minimum distance
-              <input class="issue-filter" type="number" min="0" step="any" placeholder="No minimum" data-issue-min-distance>
-            </label>
-            <label>Maximum distance
-              <input class="issue-filter" type="number" min="0" step="any" placeholder="No maximum" data-issue-max-distance>
-            </label>
-          </div>
-          <div class="issue-chips" aria-label="Issue severity filters">
-            <button class="issue-chip" type="button" data-issue-chip="" aria-pressed="true">All {{ issue_counts.total }}</button>
-            <button class="issue-chip" type="button" data-issue-chip="failed" aria-pressed="false">Failed {{ issue_counts.failed }}</button>
-            <button class="issue-chip" type="button" data-issue-chip="red" aria-pressed="false">Red {{ issue_counts.red }}</button>
-            <button class="issue-chip" type="button" data-issue-chip="yellow" aria-pressed="false">Yellow {{ issue_counts.yellow }}</button>
-          </div>
-          <div class="issue-actions">
-            <p class="muted" data-issue-status></p>
-            <div>
+          <div class="issue-quick-controls">
+            <input class="issue-filter issue-search" type="search" aria-label="Search model or engine" placeholder="Search model or engine" data-issue-search>
+            <div class="issue-chips" aria-label="Issue severity filters">
+              <button class="issue-chip" type="button" data-issue-chip="" aria-pressed="true">All {{ issue_counts.total }}</button>
+              <button class="issue-chip" type="button" data-issue-chip="failed" aria-pressed="false">Failed {{ issue_counts.failed }}</button>
+              <button class="issue-chip" type="button" data-issue-chip="red" aria-pressed="false">High {{ issue_counts.red }}</button>
+              <button class="issue-chip" type="button" data-issue-chip="yellow" aria-pressed="false">Review {{ issue_counts.yellow }}</button>
+            </div>
+            <div class="issue-actions">
+              <p class="muted issue-status" data-issue-status></p>
               <button class="issue-action" type="button" data-issue-collapse-all>Collapse all</button>
               <button class="issue-action" type="button" data-issue-expand-filtered>Expand filtered</button>
             </div>
           </div>
+          <details class="issue-filters">
+            <summary>More filters</summary>
+            <div class="issue-controls">
+              <label>Kind
+                <select class="issue-filter" data-issue-kind>
+                  <option value="">All kinds</option>
+                  <option value="Report">Report</option>
+                  <option value="Output">Output</option>
+                </select>
+              </label>
+              <label>Severity
+                <select class="issue-filter" data-issue-severity>
+                  <option value="">All severities</option>
+                  <option value="failed">Failed comparison</option>
+                  <option value="red">High difference (&gt;10%)</option>
+                  <option value="yellow">Review (1–10%)</option>
+                </select>
+              </label>
+              <label>Engine pair
+                <select class="issue-filter" data-issue-engine-pair>
+                  <option value="">All engine pairs</option>
+                </select>
+              </label>
+              <label>Minimum distance
+                <input class="issue-filter" type="number" min="0" step="any" placeholder="No minimum" data-issue-min-distance>
+              </label>
+              <label>Maximum distance
+                <input class="issue-filter" type="number" min="0" step="any" placeholder="No maximum" data-issue-max-distance>
+              </label>
+            </div>
+          </details>
         </div>
         <div class="table-scroll issue-queue">
           <table class="priority-table" data-issue-queue>
@@ -995,54 +1265,28 @@
                 <th><button class="sort-button" type="button" data-issue-sort="engine">Engines</button></th>
                 <th><button class="sort-button" type="button" data-issue-sort="distance">Distance</button></th>
                 <th><button class="sort-button" type="button" data-issue-sort="diagnostics">Diagnostics</button></th>
-                <th>Evidence</th>
                 <th>Next</th>
               </tr>
             </thead>
             {% for group in issue_groups %}
-            <tbody data-issue-group data-issue-model="{{ group.model }}" data-issue-kind="{{ group.kinds|join(' ') }}" data-issue-engine-pair="{{ group.engine_pair }}" data-issue-distance="{{ group.distance }}" data-issue-diagnostics="{{ group.diagnostics }}">
+            <tbody data-issue-group data-collapsed="true" data-issue-model="{{ group.model }}" data-issue-kind="{{ group.kinds|join(' ') }}" data-issue-engine-pair="{{ group.engine_pair }}" data-issue-distance="{{ group.distance }}" data-issue-diagnostics="{{ group.diagnostics }}">
               <tr class="issue-group-row distance-{{ group.severity }}">
-                <th><button class="issue-group-toggle" type="button" data-issue-toggle aria-expanded="true">{{ group.model }}</button></th>
-                <td>{{ group.issues|length }} issue{{ "s" if group.issues|length != 1 else "" }}</td>
-                <td>{{ group.engine_pair }}</td>
-                <td>{{ '%.6f'|format(group.distance) }}</td>
-                <td>{{ group.diagnostics }}</td>
-                <td><span class="muted">—</span></td>
-                <td><button class="issue-group-toggle" type="button" data-issue-toggle data-issue-collapse-label aria-expanded="true">Collapse</button></td>
+                <th data-label="Model"><button class="issue-group-toggle" type="button" data-issue-toggle aria-expanded="false">{{ group.model }}</button></th>
+                <td data-label="Kind">{{ group.issues|length }} issue{{ "s" if group.issues|length != 1 else "" }}</td>
+                <td data-label="Engines">{{ group.engine_pair }}</td>
+                <td data-label="Distance">{{ '%.6f'|format(group.distance) }}</td>
+                <td data-label="Diagnostics">{{ group.diagnostics }}</td>
+                <td data-label="Next"><span class="muted">{{ group.issues|length }} detail row{{ "s" if group.issues|length != 1 else "" }}</span></td>
               </tr>
               {% for item in group.issues %}
               {% set comparison = item.comparison %}
               <tr class="issue-row distance-{{ item.severity }}" data-issue-row data-issue-kind="{{ item.kind }}" data-issue-severity="{{ item.severity }}" data-issue-search="{{ comparison.inp_name }} {{ item.engine_pair }}" data-issue-engine-pair="{{ item.engine_pair }}" data-issue-distance="{{ comparison.overall_distance }}">
-                <td>{{ comparison.inp_name }}</td>
-                <td>{{ item.kind }}</td>
-                <td>{{ item.engine_pair }}</td>
-                <td>{{ '%.6f'|format(comparison.overall_distance) }}</td>
-                <td>{% if item.diagnostics is not none %}{{ item.diagnostics }}{% else %}<span class="muted">—</span>{% endif %}</td>
-                <td>
-                  <details class="issue-evidence">
-                    <summary>Preview</summary>
-                    {% if item.kind == "Report" %}
-                      {% if item.diagnostic_rows %}
-                      <ul>
-                        {% for row in item.diagnostic_rows[:3] %}
-                        <li><strong>{{ row.kind }}</strong>: {{ row.message_a or "—" }}{% if row.message_b %} / {{ row.message_b }}{% endif %}</li>
-                        {% endfor %}
-                      </ul>
-                      {% else %}
-                      <p class="muted">No report diagnostics.</p>
-                      {% endif %}
-                    {% elif item.graphical_series %}
-                    <ul>
-                      {% for series in item.graphical_series[:3] %}
-                      <li>{{ series.element_type }} {{ series.element_name }} · {{ series.attribute }} · {{ '%.6f'|format(series.distance) }}</li>
-                      {% endfor %}
-                    </ul>
-                    {% else %}
-                    <p class="muted">{{ item.graphical_unavailable_reason or "No graphical data was retained." }}</p>
-                    {% endif %}
-                  </details>
-                </td>
-                <td><a class="jump-link" href="#{{ item.explorer_id }}" data-explorer-target="{{ item.dom_id }}">Open {{ item.kind|lower }}</a></td>
+                <td data-label="Model">{{ comparison.inp_name }}</td>
+                <td data-label="Kind">{{ item.kind }}</td>
+                <td data-label="Engines">{{ item.engine_pair }}</td>
+                <td data-label="Distance">{{ '%.6f'|format(comparison.overall_distance) }}</td>
+                <td data-label="Diagnostics">{% if item.diagnostics is not none %}{{ item.diagnostics }}{% else %}<span class="muted">—</span>{% endif %}</td>
+                <td data-label="Next"><a class="jump-link" href="#{{ item.explorer_id }}" data-explorer-target="{{ item.dom_id }}">Open {{ item.kind|lower }}</a></td>
               </tr>
               {% endfor %}
             </tbody>
@@ -1055,53 +1299,7 @@
       {% endif %}
     </section>
 
-    <section class="card" id="performance">
-      <h2>{{ duration_heading }}</h2>
-      <canvas id="runtimeChart"></canvas>
-    </section>
 
-    <section class="card">
-      <details class="compact-details">
-        <summary>Performance table ({{ engines|length }} engines × {{ models|length }} models)</summary>
-        <div class="table-scroll">
-        <table data-performance-table>
-          <thead>
-            <tr>
-              <th><button class="sort-button" type="button" data-sort-model aria-label="Sort models by name">Model</button></th>
-              {% for engine in engines %}
-              <th><button class="sort-button" type="button" data-sort-index="{{ loop.index0 }}" aria-label="Sort models by {{ engine }} analysis duration">{{ engine }}</button></th>
-              {% endfor %}
-            </tr>
-          </thead>
-          <tbody>
-            {% for model in models %}
-            <tr data-model="{{ model }}">
-              <th>{{ model }}</th>
-              {% for engine in engines %}
-              {% set cell = matrix.get(engine, {}).get(model) %}
-              <td data-performance-index="{{ loop.index0 }}" data-duration="{{ cell.duration_s if cell and cell.duration_s is not none else '' }}">
-                {% if cell %}
-                  <div class="nowrap"><strong>{{ '%.3f'|format(cell.duration_s) if cell.duration_s is not none else '-' }} s</strong></div>
-                  <div class="muted">{{ '%.2f'|format(cell.peak_memory_mb) if cell.peak_memory_mb is not none else '-' }} MB</div>
-                  <div class="muted">exit {{ cell.exit_code if cell.exit_code is not none else '-' }}</div>
-                  {% if cell.error %}<div class="muted">{{ cell.error }}</div>{% endif %}
-                {% else %}
-                  -
-                {% endif %}
-              </td>
-              {% endfor %}
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      </details>
-    </section>
-
-    <section class="card">
-      <h2>HTML comparison criteria</h2>
-      <p class="muted">Detailed report tables are only embedded when distance is above {{ '%.0f'|format(comparison_exclusion_threshold * 100) }}% or warnings require attention. Output time-series data is retained only above that threshold. Placeholder comparisons: {{ excluded_report_comparison_count }} report-table; {{ excluded_output_comparison_count }} output. The JSON results retain every computed comparison.</p>
-    </section>
 
     {% if interface_groups %}
       {% for group in interface_groups %}
@@ -1152,9 +1350,58 @@
       {{ render_comparisons("Report", comparison_rows, "No report comparisons exceeded the HTML inclusion threshold.", "Table") }}
       {{ render_output_comparisons("Output", output_drilldowns, "No output comparisons exceeded the HTML inclusion threshold.") }}
     {% endif %}
+    <section class="card performance-card" id="performance">
+      <div class="performance-head">
+        <h2>{{ duration_heading }}</h2>
+        <span class="muted"><span class="meta-label">Run matrix</span> {{ engines|length }} engines × {{ models|length }} models</span>
+      </div>
+      <canvas id="runtimeChart"></canvas>
+      <details class="compact-details">
+        <summary>Performance table ({{ engines|length }} engines × {{ models|length }} models)</summary>
+        <div class="table-scroll">
+        <table data-performance-table>
+          <thead>
+            <tr>
+              <th><button class="sort-button" type="button" data-sort-model aria-label="Sort models by name">Model</button></th>
+              {% for engine in engines %}
+              <th><button class="sort-button" type="button" data-sort-index="{{ loop.index0 }}" aria-label="Sort models by {{ engine }} analysis duration">{{ engine }}</button></th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for model in models %}
+            <tr data-model="{{ model }}">
+              <th>{{ model }}</th>
+              {% for engine in engines %}
+              {% set cell = matrix.get(engine, {}).get(model) %}
+              <td data-performance-index="{{ loop.index0 }}" data-duration="{{ cell.duration_s if cell and cell.duration_s is not none else '' }}">
+                {% if cell %}
+                  <div class="nowrap"><strong>{{ '%.3f'|format(cell.duration_s) if cell.duration_s is not none else '-' }} s</strong></div>
+                  <div class="muted">{{ '%.2f'|format(cell.peak_memory_mb) if cell.peak_memory_mb is not none else '-' }} MB</div>
+                  <div class="muted">exit {{ cell.exit_code if cell.exit_code is not none else '-' }}</div>
+                  {% if cell.error %}<div class="muted">{{ cell.error }}</div>{% endif %}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      </details>
+    </section>
+
+    <details class="card report-criteria">
+      <summary>What this report includes</summary>
+      <p class="muted">Detailed report tables are embedded when distance is above {{ '%.0f'|format(comparison_exclusion_threshold * 100) }}% or warnings require attention. Output time-series data follows the same threshold. Not comparable or matching comparisons: {{ excluded_report_comparison_count }} report-table; {{ excluded_output_comparison_count }} output. Graph JSON is parsed only after opening a comparison. The JSON results retain every computed comparison.</p>
+    </details>
   </div>
 
   <script>
+    const cssRoot = getComputedStyle(document.documentElement);
+    const cssColor = name => cssRoot.getPropertyValue(name).trim();
     const outputCrosshair = {
       id: 'outputCrosshair',
       afterDraw(chart) {
@@ -1167,7 +1414,7 @@
         ctx.moveTo(x, chartArea.top);
         ctx.lineTo(x, chartArea.bottom);
         ctx.lineWidth = 1;
-        ctx.strokeStyle = '#64748b';
+        ctx.strokeStyle = cssColor('--muted');
         ctx.setLineDash([4, 4]);
         ctx.stroke();
         ctx.restore();
@@ -1306,8 +1553,8 @@
                 {
                   label: engineA,
                   data: selected.values_a,
-                  borderColor: '#2563eb',
-                  backgroundColor: '#2563eb',
+                  borderColor: cssColor('--engine-a'),
+                  backgroundColor: cssColor('--engine-a'),
                   borderWidth: 2,
                   pointRadius: selected.timestamps.length < 2 ? 4 : 0,
                   pointHoverRadius: 5,
@@ -1317,8 +1564,8 @@
                 {
                   label: engineB,
                   data: selected.values_b,
-                  borderColor: '#c2410c',
-                  backgroundColor: '#c2410c',
+                  borderColor: cssColor('--engine-b'),
+                  backgroundColor: cssColor('--engine-b'),
                   borderWidth: 2,
                   borderDash: [7, 4],
                   pointRadius: selected.timestamps.length < 2 ? 4 : 0,
@@ -1337,12 +1584,12 @@
               scales: {
                 x: {
                   title: { display: true, text: 'Reporting time' },
-                  grid: { color: '#eef2f7' },
+                  grid: { color: cssColor('--grid-soft') },
                   ticks: { maxTicksLimit: 10, maxRotation: 0 }
                 },
                 y: {
                   title: { display: true, text: selected.attribute },
-                  grid: { color: '#e5e7eb' }
+                  grid: { color: cssColor('--grid') }
                 }
               },
               plugins: {
@@ -1372,8 +1619,8 @@
                     drag: {
                       enabled: true,
                       modifierKey: 'shift',
-                      backgroundColor: 'rgba(37, 99, 235, 0.12)',
-                      borderColor: '#2563eb',
+                      backgroundColor: 'rgba(15, 107, 99, 0.14)',
+                      borderColor: cssColor('--accent'),
                       borderWidth: 1
                     },
                     onZoomComplete: () => { resetZoomButton.disabled = false; }
@@ -1464,6 +1711,7 @@
       const enginePair = explorer.querySelector('[data-explorer-engine-pair]');
       const minimumDistance = explorer.querySelector('[data-explorer-min-distance]');
       const maximumDistance = explorer.querySelector('[data-explorer-max-distance]');
+      const showMatches = explorer.querySelector('[data-explorer-show-matches]');
       const status = explorer.querySelector('[data-explorer-status]');
 
       if (enginePair) {
@@ -1506,7 +1754,8 @@
           const matchesPair = !selectedPair || item.dataset.enginePair === selectedPair;
           const matchesMinimum = !hasMinimum || distance >= minimum;
           const matchesMaximum = !hasMaximum || distance <= maximum;
-          const visible = matchesQuery && matchesSeverity && matchesPair && matchesMinimum && matchesMaximum;
+          const matchesMatchToggle = selectedSeverity === 'green' || (showMatches && showMatches.checked) || item.dataset.severity !== 'green';
+          const visible = matchesQuery && matchesSeverity && matchesPair && matchesMinimum && matchesMaximum && matchesMatchToggle;
           item.closest('li').hidden = !visible;
           item.hidden = !visible;
           if (visible) visibleCount += 1;
@@ -1526,8 +1775,18 @@
       if (enginePair) enginePair.addEventListener('change', applyFilters);
       if (minimumDistance) minimumDistance.addEventListener('input', applyFilters);
       if (maximumDistance) maximumDistance.addEventListener('input', applyFilters);
+      if (showMatches) showMatches.addEventListener('change', applyFilters);
       applyFilters();
     }
+    function setSortIndicator(buttons, activeButton, descending) {
+      buttons.forEach(button => {
+        delete button.dataset.sortDirection;
+        button.closest('th')?.removeAttribute('aria-sort');
+      });
+      activeButton.dataset.sortDirection = descending ? 'desc' : 'asc';
+      activeButton.closest('th')?.setAttribute('aria-sort', descending ? 'descending' : 'ascending');
+    }
+
     function initializeIssueQueue(container) {
       const table = container.querySelector('[data-issue-queue]');
       if (!table) return;
@@ -1603,10 +1862,7 @@
 
       function sortGroups(key, button) {
         const descending = button.dataset.sortDirection !== 'desc';
-        table.querySelectorAll('[data-issue-sort]').forEach(item => {
-          delete item.dataset.sortDirection;
-        });
-        button.dataset.sortDirection = descending ? 'desc' : 'asc';
+        setSortIndicator(table.querySelectorAll('[data-issue-sort]'), button, descending);
         const value = group => group.dataset[`issue${key[0].toUpperCase()}${key.slice(1)}`];
         groups
           .sort((a, b) => {
@@ -1659,6 +1915,40 @@
     }
 
 
+    document.querySelectorAll('[data-section-table]').forEach(table => {
+      const tbody = table.tBodies[0];
+      const rows = () => Array.from(tbody.rows);
+      const tools = table.closest('.table-scroll')?.querySelector('[data-section-table-tools]');
+      const onlyDifferences = tools?.querySelector('[data-section-only-differences]');
+      const sortDistance = tools?.querySelector('[data-section-sort-distance]');
+      function applySectionFilters() {
+        const hideMatches = Boolean(onlyDifferences?.checked);
+        rows().forEach(row => {
+          row.hidden = hideMatches && row.dataset.hasDifferences !== 'true';
+        });
+      }
+      onlyDifferences?.addEventListener('change', applySectionFilters);
+      sortDistance?.addEventListener('click', () => {
+        rows()
+          .sort((a, b) => Number(b.dataset.sectionDistance) - Number(a.dataset.sectionDistance))
+          .forEach(row => tbody.append(row));
+        applySectionFilters();
+      });
+      table.closest('.table-scroll')?.querySelectorAll('[data-copy-table-name]').forEach(button => {
+        button.addEventListener('click', async () => {
+          const value = button.dataset.copyTableName;
+          try {
+            await navigator.clipboard.writeText(value);
+            button.textContent = 'Copied';
+            setTimeout(() => { button.textContent = 'Copy table name'; }, 1200);
+          } catch {
+            button.textContent = value;
+          }
+        });
+      });
+      applySectionFilters();
+    });
+
     document.querySelectorAll('[data-comparison-explorer]').forEach(initializeComparisonExplorer);
     document.querySelectorAll('[data-issue-queue-container]').forEach(initializeIssueQueue);
 
@@ -1678,8 +1968,7 @@
       const rows = () => Array.from(tbody.rows);
       function sortRows(compare, button) {
         const descending = button.dataset.sortDirection !== 'desc';
-        table.querySelectorAll('.sort-button').forEach(item => { delete item.dataset.sortDirection; });
-        button.dataset.sortDirection = descending ? 'desc' : 'asc';
+        setSortIndicator(table.querySelectorAll('.sort-button'), button, descending);
         rows().sort((a, b) => compare(a, b, descending)).forEach(row => tbody.append(row));
       }
       table.querySelector('[data-sort-model]')?.addEventListener('click', event => {
@@ -1709,8 +1998,8 @@
           datasets: [{
             label: {{ duration_chart_label | tojson }},
             data: {{ chart_values | tojson }},
-            backgroundColor: '#60a5fa',
-            borderColor: '#2563eb',
+            backgroundColor: cssColor('--channel'),
+            borderColor: cssColor('--accent'),
             borderWidth: 1
           }]
         },

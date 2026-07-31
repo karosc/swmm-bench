@@ -211,7 +211,7 @@ class ReporterTests(unittest.TestCase):
         self.assertNotIn("<th>Series</th>", html)
         self.assertNotIn(">Tabular</button>", html)
         self.assertNotIn('role="tablist"', html)
-        self.assertIn("graphical view loads on click", html)
+        self.assertIn("1 plotted series", html)
         self.assertIn("Element type", html)
         self.assertIn("Search element or attribute", html)
         self.assertIn("Overall output distance", html)
@@ -243,20 +243,26 @@ class ReporterTests(unittest.TestCase):
         self.assertIn("modifierKey: 'shift'", html)
         self.assertIn("modifierKey: 'alt'", html)
         self.assertIn("chart.resetZoom();", html)
-        self.assertIn("HTML comparison criteria", html)
+        self.assertIn("What this report includes", html)
         self.assertIn("distance is above 1%", html)
-        self.assertIn("Disagreement overview", html)
-        self.assertIn("Issue queue", html)
+        self.assertIn("Comparison overview", html)
+        self.assertIn("Issues", html)
+        self.assertNotIn('class="storm-trace"', html)
         self.assertIn("data-issue-queue", html)
+        self.assertIn('data-label="Model"', html)
         self.assertIn("data-issue-kind", html)
         self.assertIn("data-issue-chip", html)
         self.assertIn("data-issue-sort", html)
+        self.assertIn("data-explorer-show-matches", html)
+        self.assertIn("data-section-only-differences", html)
+        self.assertIn("data-section-sort-distance", html)
+        self.assertIn("data-copy-table-name", html)
         self.assertIn("data-issue-toggle", html)
-        self.assertIn("Preview", html)
-        self.assertIn("issue-summary-filter", html)
+        self.assertNotIn('data-label="Evidence"', html)
+        self.assertNotIn("issue-summary-filter", html)
+        self.assertIn('class="severity-key"', html)
         self.assertIn("issue-toolbar", html)
-        self.assertIn("data-issue-collapse-all", html)
-        self.assertIn("data-issue-expand-filtered", html)
+        self.assertIn("More filters", html)
         self.assertIn("Performance table (0 engines × 0 models)", html)
         self.assertIn("data-performance-table", html)
         self.assertIn("data-sort-model", html)
@@ -275,7 +281,7 @@ class ReporterTests(unittest.TestCase):
         self.assertIn("data-explorer-max-distance", html)
         self.assertIn("data-engine-pair=", html)
         self.assertIn("data-distance=", html)
-        self.assertIn("Placeholder comparisons: 2 report-table; 2 output", html)
+        self.assertIn("Not comparable or matching comparisons: 2 report-table; 2 output", html)
         self.assertIn("warning-report.inp", html)
         self.assertIn(
             "WARNING: table &#39;bad_table&#39; could not be parsed: bad table",
@@ -290,7 +296,7 @@ class ReporterTests(unittest.TestCase):
         self.assertIn(">WARNING 09: timestep reduced</td>", html)
         self.assertIn(">WARNING 10: continuity warning</td>", html)
         self.assertIn("Comparison cannot be made: a and b models failed.", html)
-        self.assertIn("Report diagnostics", html)
+        self.assertIn("Diagnostics", html)
         self.assertIn("2 errors", html)
         self.assertIn("3 warnings", html)
         self.assertIn("missing table", html)
@@ -301,10 +307,10 @@ class ReporterTests(unittest.TestCase):
         self.assertIn("<th>b</th>", html)
         self.assertIn("matching-report.inp", html)
         self.assertIn("matching-output.inp", html)
-        self.assertIn("0.010000 did not meet inclusion threshold of 0.010000", html)
-        self.assertIn("0.000000 did not meet inclusion threshold of 0.010000", html)
+        self.assertIn("0.010000 hidden as matching (≤0.010000)", html)
+        self.assertIn("0.000000 hidden as matching (≤0.010000)", html)
         self.assertIn("summary-only-output.inp", html)
-        self.assertIn("0.001000 did not meet inclusion threshold of 0.010000", html)
+        self.assertIn("0.001000 hidden as matching (≤0.010000)", html)
         self.assertNotIn("summary-only-series", html)
 
     def test_html_retains_all_above_threshold_output_graphs(self) -> None:
@@ -397,7 +403,7 @@ class ReporterTests(unittest.TestCase):
         self.assertIn("a vs b", issue_queue)
         self.assertIn("a vs failed", issue_queue)
         self.assertEqual(
-            issue_queue.count("<td>model.inp</td>"),
+            issue_queue.count('data-label="Model">model.inp</td>'),
             issue_queue.count("data-issue-row"),
         )
         self.assertIn("b vs failed", issue_queue)
@@ -466,9 +472,10 @@ class ReporterTests(unittest.TestCase):
         self.assertIn("complex/rtk.inp", html)
         self.assertIn("openswmm vs runswmmrs", html)
         self.assertIn("Comparison cannot be made: runswmmrs model failed.", html)
-        self.assertIn("Placeholder comparisons: 1 report-table; 1 output", html)
+        self.assertIn("Not comparable or matching comparisons: 1 report-table; 1 output", html)
         self.assertIn('data-severity="failed"', html)
         self.assertIn('class="graph-empty distance-failed"', html)
+        self.assertIn("Check the engine exit code.", html)
         self.assertNotIn("failed_table", html)
 
     def test_included_comparison_does_not_inherit_prior_placeholder(self) -> None:
@@ -606,7 +613,7 @@ class ReporterTests(unittest.TestCase):
 
         self.assertNotIn(">Tabular</button>", html)
         self.assertNotIn(">Graphical</button>", html)
-        self.assertIn("Graphical data was not retained for this result", html)
+        self.assertIn("No time-series samples were saved for this comparison", html)
         self.assertIn("Legacy pointwise relative distance", html)
         self.assertIn(
             "Near-zero values can therefore produce large relative scores", html

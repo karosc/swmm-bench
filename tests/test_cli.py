@@ -227,12 +227,13 @@ class BenchmarkCliTests(unittest.TestCase):
             self.assertEqual(report_result.exit_code, 0, report_result.output)
             report_html = report_path.read_text(encoding="utf-8")
             self.assertNotIn('<script type="application/json"', report_html)
-            self.assertIn("HTML comparison criteria", report_html)
+            self.assertIn("What this report includes", report_html)
             self.assertIn(
-                "Placeholder comparisons: 1 report-table; 1 output", report_html
+                "Not comparable or matching comparisons: 1 report-table; 1 output",
+                report_html,
             )
             self.assertIn(
-                "0.000000 did not meet inclusion threshold of 0.010000", report_html
+                "0.000000 hidden as matching (≤0.010000)", report_html
             )
 
     def test_report_command_autoescapes_saved_json_values(self) -> None:

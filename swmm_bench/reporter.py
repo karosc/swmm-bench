@@ -230,13 +230,13 @@ def _comparison_key(comparison: ModelComparison) -> tuple[str, str, str]:
 
 def _below_threshold_reason(distance: float) -> str:
     return (
-        f"{distance:.6f} did not meet inclusion threshold of "
-        f"{_HTML_COMPARISON_DISTANCE_THRESHOLD:.6f}"
+        f"{distance:.6f} hidden as matching "
+        f"(≤{_HTML_COMPARISON_DISTANCE_THRESHOLD:.6f})"
     )
 
 
 def _failed_placeholder(reason: str | None) -> bool:
-    return bool(reason and "did not meet inclusion threshold" not in reason)
+    return bool(reason and "hidden as matching" not in reason)
 
 
 def _view_severity(comparison: ModelComparison, placeholder_reason: str | None) -> str:
@@ -651,6 +651,7 @@ def _build_template_context(result: BenchmarkResult) -> dict[str, Any]:
         "comparison_rows": comparison_rows,
         "output_drilldowns": output_drilldowns,
         "issue_groups": issue_groups,
+        "interface_groups": interface_groups,
         "issue_counts": issue_counts,
         "comparison_exclusion_threshold": _HTML_COMPARISON_DISTANCE_THRESHOLD,
         "excluded_report_comparison_count": report_placeholder_count,
