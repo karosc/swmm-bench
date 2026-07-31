@@ -1,6 +1,6 @@
 # Curated regression model suite
 
-This directory packages a compact set of SWMM input models for regression testing `swmm-bench` and SWMM engine behavior without depending on the full `1729-SWMM5-Models` submodule at runtime. Installed users can list and run it with `swmm-bench suite list` and `swmm-bench suite run`.
+This directory packages a compact set of SWMM input models for regression testing `swmm-bench` and SWMM engine behavior without depending on the full source catalogs at runtime. Some models were copied or adapted from [SWMMEnablement/1729-SWMM5-Models](https://github.com/SWMMEnablement/1729-SWMM5-Models/) and [pyswmm/swmm-nrtestsuite](https://github.com/pyswmm/swmm-nrtestsuite). Installed users can list and run it with `swmm-test list` and `swmm-test run`.
 
 ## Organization
 

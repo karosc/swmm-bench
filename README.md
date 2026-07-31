@@ -166,6 +166,10 @@ series distance = missing fraction + (1 - missing fraction) * numeric distance
 
 The overall output distance is the equal-weight mean across semantic series. The generated HTML report includes the same definition and identifies legacy schema-2/3 scores separately.
 
+## Acknowledgements
+
+Some bundled regression models are copied or adapted from [SWMMEnablement/1729-SWMM5-Models](https://github.com/SWMMEnablement/1729-SWMM5-Models/) and [pyswmm/swmm-nrtestsuite](https://github.com/pyswmm/swmm-nrtestsuite). Per-model source notes live in `swmm_bench/resources/regression-suite/README.md` and `CITATION.txt`.
+
 ## Development
 
 ```bash
