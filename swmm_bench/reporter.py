@@ -643,6 +643,37 @@ def _build_template_context(result: BenchmarkResult) -> dict[str, Any]:
         len(item["comparison"].report_warnings) for item in comparison_rows
     )
 
+    distance_chart_rows = []
+    for kind, rows in (
+        ("Report", comparison_rows),
+        ("Output", output_drilldowns),
+    ):
+        for item in rows:
+            comparison = item["comparison"]
+            distance_chart_rows.append(
+                {
+                    "kind": kind,
+                    "model": comparison.inp_name,
+                    "engine_a": comparison.engine_a,
+                    "engine_b": comparison.engine_b,
+                    "distance": (
+                        None
+                        if _failed_placeholder(item["placeholder_reason"])
+                        else comparison.overall_distance
+                    ),
+                    "dom_id": item["dom_id"],
+                }
+            )
+    distance_chart_engines = sorted(
+        {
+            engine
+            for item in distance_chart_rows
+            for engine in (item["engine_a"], item["engine_b"])
+        }
+    )
+    distance_chart_models = sorted({item["model"] for item in distance_chart_rows})
+
+
     return {
         "result": result,
         "engines": engines,
@@ -660,6 +691,9 @@ def _build_template_context(result: BenchmarkResult) -> dict[str, Any]:
         "report_warning_count": report_warning_count,
         "chart_labels": engines,
         "chart_values": average_durations,
+        "distance_chart_rows": distance_chart_rows,
+        "distance_chart_engines": distance_chart_engines,
+        "distance_chart_models": distance_chart_models,
         "duration_heading": f"Average {duration_name} by engine",
         "duration_chart_label": f"Average {duration_name} (s)",
     }

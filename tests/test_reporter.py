@@ -282,6 +282,22 @@ class ReporterTests(unittest.TestCase):
         self.assertIn("data-engine-pair=", html)
         self.assertIn("data-distance=", html)
         self.assertIn("Not comparable or matching comparisons: 2 report-table; 2 output", html)
+        self.assertIn("Distance by selected baseline", html)
+        self.assertIn("data-distance-baseline", html)
+        self.assertIn("data-distance-kind", html)
+        self.assertIn("data-distance-engines", html)
+        self.assertIn("data-distance-chart", html)
+        self.assertIn("distance-overview-data", html)
+        self.assertIn("data-distance-reset", html)
+        self.assertIn("data-distance-zoom-mode", html)
+        self.assertIn("openExplorerItem(record.dom_id)", html)
+        self.assertIn("row.model === model", html)
+        self.assertIn("Clustered bar chart of report or output distances", html)
+        self.assertIn("text: 'Model Run'", html)
+        self.assertIn("ticks: { display: false }", html)
+        self.assertIn("mode: axisMode", html)
+        self.assertIn("limits: { y: { min: 0 } }", html)
+        self.assertIn("y: { beginAtZero: true, min: 0", html)
         self.assertIn("warning-report.inp", html)
         self.assertIn(
             "WARNING: table &#39;bad_table&#39; could not be parsed: bad table",
@@ -619,7 +635,7 @@ class ReporterTests(unittest.TestCase):
             "Near-zero values can therefore produce large relative scores", html
         )
         self.assertNotIn("Symmetric NRMSE + missing penalty", html)
-        self.assertNotIn('<script type="application/json"', html)
+        self.assertNotIn(" data-output-series-data>", html)
 
 
 if __name__ == "__main__":

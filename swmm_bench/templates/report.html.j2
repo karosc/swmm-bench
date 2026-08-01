@@ -319,6 +319,59 @@
       margin-left: 8px;
     }
     #runtimeChart { max-height: 220px; }
+    .distance-overview-card {
+      display: grid;
+      gap: 12px;
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .distance-overview-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px 16px;
+    }
+    .distance-overview-controls {
+      grid-template-columns: minmax(160px, 1fr) minmax(140px, 0.7fr) minmax(140px, 0.7fr) minmax(180px, 1fr);
+      gap: 8px;
+    }
+    .distance-overview-controls label {
+      display: grid;
+      gap: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .distance-overview-controls select {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 6px 8px;
+      background: var(--card);
+      color: var(--text);
+      font-size: 12px;
+    }
+    .distance-overview-controls select[multiple] {
+      min-height: 78px;
+    }
+    .distance-overview-frame {
+      position: relative;
+      min-height: 280px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      background: var(--card);
+    }
+    .distance-overview-frame canvas {
+      width: 100% !important;
+      height: 280px !important;
+    }
+    .distance-overview-status {
+      margin: 0;
+      font-size: 12px;
+    }
     .issue-filter {
       width: 100%;
       min-width: 0;
@@ -583,6 +636,7 @@
     .issue-action:focus-visible,
     .issue-group-toggle:focus-visible,
     .chart-reset:focus-visible,
+    .distance-overview-controls select:focus-visible,
     .section-nav a:focus-visible,
     .jump-link:focus-visible {
       outline: 3px solid var(--accent);
@@ -757,6 +811,8 @@
       .graph-score-grid { grid-template-columns: 1fr; }
       .graph-heading-row { display: block; }
       .chart-toolbar { align-items: flex-start; flex-direction: column; }
+      .distance-overview-controls { grid-template-columns: 1fr; }
+      .distance-overview-frame canvas { height: 340px !important; }
       .issue-queue {
         max-height: none;
         overflow: visible;
@@ -1201,6 +1257,47 @@
         <div class="meta-item summary-stat"><span class="meta-label">Diagnostics</span><strong>{{ report_error_count }} errors</strong><span class="muted">{{ report_warning_count }} warnings</span></div>
         <div class="meta-item summary-stat"><span class="meta-label">Run matrix</span><strong>{{ engines|length }} × {{ models|length }}</strong><span class="muted">engines × models</span></div>
       </div>
+      {% if distance_chart_rows %}
+      <div class="distance-overview-card" data-distance-overview>
+        <div class="distance-overview-head">
+          <div>
+            <h3>Distance by selected baseline</h3>
+            <p class="muted">Each model run is a cluster of selected engines compared with the baseline engine. Click a bar to open that comparison.</p>
+          </div>
+          <button class="chart-reset" type="button" data-distance-reset disabled>Reset zoom</button>
+          <p class="muted distance-overview-status" data-distance-overview-status aria-live="polite"></p>
+        </div>
+        <div class="distance-overview-controls">
+          <label>Baseline engine
+            <select data-distance-baseline></select>
+          </label>
+          <label>Distance kind
+            <select data-distance-kind>
+              <option value="Report">Report</option>
+              <option value="Output">Output</option>
+            </select>
+          </label>
+          <label>Zoom/pan axis
+            <select data-distance-zoom-mode>
+              <option value="x">X axis</option>
+              <option value="y">Y axis</option>
+            </select>
+          </label>
+          <label>Engines to draw
+            <select multiple data-distance-engines aria-describedby="distance-overview-help"></select>
+          </label>
+        </div>
+        <div class="distance-overview-frame">
+          <canvas data-distance-chart role="img" aria-describedby="distance-overview-help">Clustered bar chart of report or output distances by model and engine.</canvas>
+        </div>
+        <p class="muted" id="distance-overview-help">Ctrl/Cmd-click to select multiple engines. Choose an axis, then Ctrl + wheel or pinch zooms, Shift + drag selects a zoom window, and Alt + drag pans. The y-axis minimum stays locked at 0.</p>
+      </div>
+      <script type="application/json" id="distance-overview-data">{{ {
+        "rows": distance_chart_rows,
+        "engines": distance_chart_engines,
+        "models": distance_chart_models
+      } | tojson }}</script>
+      {% endif %}
       {% if issue_groups %}
       <h3 class="priority-heading">Issues</h3>
       <p class="severity-key" aria-label="Severity scale">
@@ -1395,6 +1492,8 @@
 
     <details class="card report-criteria">
       <summary>What this report includes</summary>
+
+
       <p class="muted">Detailed report tables are embedded when distance is above {{ '%.0f'|format(comparison_exclusion_threshold * 100) }}% or warnings require attention. Output time-series data follows the same threshold. Not comparable or matching comparisons: {{ excluded_report_comparison_count }} report-table; {{ excluded_output_comparison_count }} output. Graph JSON is parsed only after opening a comparison. The JSON results retain every computed comparison.</p>
     </details>
   </div>
@@ -1425,6 +1524,201 @@
       if (distance <= 0.01) return 'distance-green';
       if (distance <= 0.1) return 'distance-yellow';
       return 'distance-red';
+    }
+
+    function openExplorerItem(panelId) {
+      const item = panelId && document.querySelector(`[data-explorer-item][data-panel-id="${panelId}"]`);
+      if (!item) return false;
+      item.closest('[data-comparison-explorer]')?.scrollIntoView({ block: 'start' });
+      item.click();
+      return true;
+    }
+
+    function initializeDistanceOverview(container) {
+      const dataNode = document.getElementById('distance-overview-data');
+      const baseline = container.querySelector('[data-distance-baseline]');
+      const kind = container.querySelector('[data-distance-kind]');
+      const engines = container.querySelector('[data-distance-engines]');
+      const status = container.querySelector('[data-distance-overview-status]');
+      const canvas = container.querySelector('[data-distance-chart]');
+      const zoomMode = container.querySelector('[data-distance-zoom-mode]');
+      const resetZoomButton = container.querySelector('[data-distance-reset]');
+      let chart = null;
+      let payload;
+      try {
+        payload = JSON.parse(dataNode.textContent);
+      } catch {
+        status.textContent = 'Distance chart data could not be loaded.';
+        return;
+      }
+      const rows = Array.isArray(payload.rows) ? payload.rows : [];
+      const engineNames = Array.isArray(payload.engines) ? payload.engines : [];
+      const modelNames = Array.isArray(payload.models) ? payload.models : [];
+      if (!rows.length || engineNames.length < 2 || typeof Chart === 'undefined') {
+        status.textContent = rows.length ? 'Chart.js could not be loaded.' : 'No pairwise distances available.';
+        return;
+      }
+      const zoomAvailable = Chart.registry && Chart.registry.plugins.get('zoom');
+      resetZoomButton.addEventListener('click', () => {
+        if (chart && typeof chart.resetZoom === 'function') {
+          chart.resetZoom();
+          resetZoomButton.disabled = true;
+        }
+      });
+      if (!zoomAvailable) {
+        status.textContent = 'Zoom controls could not be loaded.';
+      }
+
+      const colors = [
+        cssColor('--channel'),
+        cssColor('--clay'),
+        cssColor('--sediment'),
+        cssColor('--failure'),
+        cssColor('--green-text'),
+        '#6f42c1',
+        '#2f6f4e'
+      ];
+      engineNames.forEach((engine, index) => {
+        baseline.append(new Option(engine, engine, index === 0, index === 0));
+        engines.append(new Option(engine, engine, index !== 0, index !== 0));
+      });
+
+      function selectedEngines() {
+        return Array.from(engines.selectedOptions).map(option => option.value);
+      }
+
+      function syncEngineOptions() {
+        const base = baseline.value;
+        let selected = selectedEngines().filter(engine => engine !== base);
+        if (!selected.length) {
+          selected = engineNames.filter(engine => engine !== base);
+        }
+        Array.from(engines.options).forEach(option => {
+          option.disabled = option.value === base;
+          option.selected = selected.includes(option.value);
+        });
+      }
+
+      function lockDistanceYMinimum() {
+        if (!chart) return;
+        chart.options.scales.y.min = 0;
+        if (chart.scales && chart.scales.y) {
+          chart.scales.y.options.min = 0;
+        }
+      }
+
+
+      function rowFor(base, target, distanceKind, model) {
+        return rows.find(row =>
+          row.model === model
+          && row.kind === distanceKind
+          && (
+            (row.engine_a === base && row.engine_b === target)
+            || (row.engine_b === base && row.engine_a === target)
+          )
+        ) || null;
+      }
+
+      function renderChart() {
+        syncEngineOptions();
+        const base = baseline.value;
+        const distanceKind = kind.value;
+        const axisMode = zoomMode.value;
+        const targets = selectedEngines().filter(engine => engine !== base);
+        const models = modelNames.filter(model =>
+          targets.some(target => rowFor(base, target, distanceKind, model)?.distance !== undefined)
+        );
+        const datasets = targets.map((engine, index) => {
+          const records = models.map(model => rowFor(base, engine, distanceKind, model));
+          return {
+            label: engine,
+            data: records.map(record => record && record.distance !== null ? record.distance : null),
+            records,
+            backgroundColor: colors[index % colors.length],
+            borderColor: colors[index % colors.length],
+            borderWidth: 1
+          };
+        });
+        status.textContent = `${models.length} model run${models.length === 1 ? '' : 's'} · ${targets.length} engine${targets.length === 1 ? '' : 's'} vs ${base}`;
+        resetZoomButton.disabled = true;
+        if (chart) chart.destroy();
+        chart = new Chart(canvas, {
+          type: 'bar',
+          data: { labels: models, datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            interaction: { mode: 'nearest', intersect: true },
+            onClick(event) {
+              const points = chart.getElementsAtEventForMode(event, 'nearest', { intersect: true }, true);
+              const point = points[0];
+              const record = point && chart.data.datasets[point.datasetIndex].records[point.index];
+              if (record) openExplorerItem(record.dom_id);
+            },
+            scales: {
+              x: {
+                stacked: false,
+                grid: { display: false },
+                title: { display: true, text: 'Model Run' },
+                ticks: { display: false }
+              },
+              y: { beginAtZero: true, min: 0, title: { display: true, text: `${distanceKind} distance` } }
+            },
+            plugins: {
+              legend: { position: 'bottom' },
+              tooltip: {
+                callbacks: {
+                  afterLabel(context) {
+                    const record = context.dataset.records[context.dataIndex];
+                    return record && record.distance === null ? 'No numeric distance' : 'Click to open explorer';
+                  }
+                }
+              },
+              zoom: {
+                limits: { y: { min: 0 } },
+                pan: {
+                  enabled: true,
+                  mode: axisMode,
+                  modifierKey: 'alt',
+                  onPanComplete: ({ chart }) => {
+                    lockDistanceYMinimum();
+                    chart.update('none');
+                    resetZoomButton.disabled = false;
+                  }
+                },
+                zoom: {
+                  mode: axisMode,
+                  wheel: {
+                    enabled: true,
+                    modifierKey: 'ctrl',
+                    speed: 0.1
+                  },
+                  pinch: { enabled: true },
+                  drag: {
+                    enabled: true,
+                    modifierKey: 'shift',
+                    backgroundColor: 'rgba(15, 107, 99, 0.14)',
+                    borderColor: cssColor('--accent'),
+                    borderWidth: 1
+                  },
+                  onZoomComplete: ({ chart }) => {
+                    lockDistanceYMinimum();
+                    chart.update('none');
+                    resetZoomButton.disabled = false;
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+
+      baseline.addEventListener('change', renderChart);
+      kind.addEventListener('change', renderChart);
+      engines.addEventListener('change', renderChart);
+      zoomMode.addEventListener('change', renderChart);
+      renderChart();
     }
 
     function initializeOutputComparison(container) {
@@ -1951,15 +2245,13 @@
 
     document.querySelectorAll('[data-comparison-explorer]').forEach(initializeComparisonExplorer);
     document.querySelectorAll('[data-issue-queue-container]').forEach(initializeIssueQueue);
+    document.querySelectorAll('[data-distance-overview]').forEach(initializeDistanceOverview);
 
     document.querySelectorAll('[data-explorer-target]').forEach(link => {
       link.addEventListener('click', event => {
-        const target = link.dataset.explorerTarget;
-        const item = target && document.querySelector(`[data-explorer-item][data-panel-id="${target}"]`);
-        if (!item) return;
-        event.preventDefault();
-        item.closest('[data-comparison-explorer]').scrollIntoView({ block: 'start' });
-        item.click();
+        if (openExplorerItem(link.dataset.explorerTarget)) {
+          event.preventDefault();
+        }
       });
     });
 
