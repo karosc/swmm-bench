@@ -25,7 +25,6 @@ from swmm_bench.models import (
 from swmm_bench.output import extract_output_frame, output_series_name
 from swmm.pandas import Report
 
-
 _MAX_RETAINED_DIFFERENCES = 100
 _MAX_GRAPH_POINTS_PER_SERIES = 120
 _MAX_GRAPH_POINTS_PER_COMPARISON = 12_000
@@ -317,6 +316,11 @@ def _extract_report_tables(
     tables: dict[str, DataFrame] = {}
     skipped: dict[str, str] = {}
     for property_name in _dataframe_property_names(type(report)):
+        if property_name in (
+            "routing_time_step_summary",
+            "highest_flow_instability_indexes",
+        ):
+            continue
         try:
             value = getattr(report, property_name)
             if not isinstance(value, DataFrame):

@@ -198,6 +198,24 @@ class ReportExtractionTests(unittest.TestCase):
     def test_discovers_only_dataframe_annotated_properties(self) -> None:
         self.assertEqual(_dataframe_property_names(FakeReport), ["table"])
 
+    def test_routing_time_step_summary_is_excluded(self) -> None:
+        class RoutingTimeStepReport:
+            def __init__(self, path: str):
+                self.path = path
+
+            @property
+            def routing_time_step_summary(self) -> DataFrame:
+                value = "00:00:01.0" if self.path == "a.rpt" else "00:00:01.1"
+                return DataFrame({"value": [value]})
+
+        with patch("swmm_bench.comparator.Report", RoutingTimeStepReport):
+            comparison = compare_rpts(
+                "a.rpt", "b.rpt", "a", "b", "model.inp", "model.inp"
+            )
+
+        self.assertEqual(comparison.overall_distance, 0.0)
+        self.assertEqual(comparison.section_comparisons, [])
+
     def test_missing_optional_sections_are_skipped(self) -> None:
         class OptionalReport:
             def __init__(self, _path: str):
