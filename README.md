@@ -122,7 +122,7 @@ Recalculate report comparisons from retained run artifacts without executing SWM
 uv run swmm-bench rebuild swmm-bench-results/nightly
 ```
 
-Add `--outputs` to also recalculate binary-output summary distances. Render a saved JSON result as HTML:
+Add `--outputs` to also recalculate binary-output comparisons and retain their chart data. Add `--all-comparisons` to retain and render chart data even when the overall distance is 1% or less. Render a saved JSON result as HTML:
 
 ```bash
 uv run swmm-bench report results.json --output report.html

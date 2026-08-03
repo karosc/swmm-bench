@@ -69,6 +69,32 @@ class OutputExtractionTests(unittest.TestCase):
         self.assertEqual(comparison.graphical_series, [])
         self.assertFalse(comparison.details_retained)
 
+    def test_graphical_series_can_be_forced_at_zero_distance(self) -> None:
+        columns = MultiIndex.from_tuples(
+            [("node", "J1", "depth")],
+            names=["element_type", "element_name", "attribute"],
+        )
+        frame = DataFrame(
+            [[1.0], [2.0]],
+            index=date_range("2026-08-03", periods=2, freq="5min"),
+            columns=columns,
+        )
+
+        comparison = _compare_output_frames(
+            frame,
+            frame,
+            "a",
+            "b",
+            "model.inp",
+            "model.inp",
+            retain_tabular=False,
+            include_all_comparisons=True,
+        )
+
+        self.assertEqual(comparison.overall_distance, 0.0)
+        self.assertEqual(len(comparison.graphical_series), 1)
+        self.assertTrue(comparison.details_retained)
+
     def test_graphical_series_aligns_semantic_values_and_missing_timestamps(
         self,
     ) -> None:

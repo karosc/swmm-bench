@@ -392,10 +392,17 @@ def rebuild(
     outputs: bool = typer.Option(
         False,
         "--outputs",
-        help="Recalculate binary-output summary distances without retaining detailed comparisons; this can be slow.",
+        help="Recalculate binary-output comparisons with detailed chart data; this can be slow.",
+    ),
+    all_comparisons: bool = typer.Option(
+        False,
+        "--all-comparisons",
+        help="Retain output chart data at every distance; requires --outputs.",
     ),
 ) -> None:
     run_directory = run_directory.expanduser().resolve()
+    if all_comparisons and not outputs:
+        raise typer.BadParameter("--all-comparisons requires --outputs.")
     engine_results = _rebuild_engine_results(run_directory)
     if not engine_results:
         raise typer.BadParameter(
@@ -472,7 +479,7 @@ def rebuild(
             output_comparisons = compare_all_outputs(
                 engine_results,
                 progress_callback=comparison_progress,
-                retain_graphical=False,
+                include_all_comparisons=all_comparisons,
             )
             if pair_total == 0:
                 progress.update(

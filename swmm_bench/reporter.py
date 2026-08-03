@@ -305,7 +305,7 @@ def _diagnostic_rows(
 def _build_template_context(result: BenchmarkResult) -> dict[str, Any]:
     uses_analysis_duration = _uses_report_analysis_duration(result)
     duration_name = "analysis duration" if uses_analysis_duration else "runtime"
-    engines = sorted({row.engine_name for row in result.engine_results})
+    engines = list(dict.fromkeys(row.engine_name for row in result.engine_results))
     models = sorted({row.inp_name for row in result.engine_results})
     matrix: dict[str, dict[str, dict[str, Any]]] = {engine: {} for engine in engines}
 
@@ -433,7 +433,10 @@ def _build_template_context(result: BenchmarkResult) -> dict[str, Any]:
                 overall_distance=0.0,
                 section_comparisons=[],
             )
-        elif comparison.overall_distance <= _HTML_COMPARISON_DISTANCE_THRESHOLD:
+        elif (
+            comparison.overall_distance <= _HTML_COMPARISON_DISTANCE_THRESHOLD
+            and not comparison.graphical_series
+        ):
             placeholder_reason = _below_threshold_reason(comparison.overall_distance)
         output_comparison_rows.append(
             {
@@ -450,6 +453,7 @@ def _build_template_context(result: BenchmarkResult) -> dict[str, Any]:
         placeholder_reason = (
             _below_threshold_reason(comparison.overall_distance)
             if comparison.overall_distance <= _HTML_COMPARISON_DISTANCE_THRESHOLD
+            and not comparison.graphical_series
             else None
         )
         output_comparison_rows.append(
@@ -664,12 +668,17 @@ def _build_template_context(result: BenchmarkResult) -> dict[str, Any]:
                     "dom_id": item["dom_id"],
                 }
             )
-    distance_chart_engines = sorted(
-        {
-            engine
-            for item in distance_chart_rows
-            for engine in (item["engine_a"], item["engine_b"])
-        }
+    distance_chart_engines = list(
+        dict.fromkeys(
+            itertools.chain(
+                engines,
+                (
+                    engine
+                    for item in distance_chart_rows
+                    for engine in (item["engine_a"], item["engine_b"])
+                ),
+            )
+        )
     )
     distance_chart_models = sorted({item["model"] for item in distance_chart_rows})
 

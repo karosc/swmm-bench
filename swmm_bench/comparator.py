@@ -862,6 +862,7 @@ def _compare_output_frames(
     progress_callback: ProgressCallback | None = None,
     retain_tabular: bool = True,
     retain_graphical: bool = True,
+    include_all_comparisons: bool = False,
 ) -> OutputComparison:
     union_columns = _output_union_columns(frame_a, frame_b)
     if not len(union_columns):
@@ -927,7 +928,10 @@ def _compare_output_frames(
     ) / len(table_comparisons)
     graphical_series: list[OutputSeriesComparison] = []
     unavailable_reason: str | None = None
-    if retain_graphical and overall_distance > _GRAPHICAL_OUTPUT_DISTANCE_THRESHOLD:
+    if retain_graphical and (
+        include_all_comparisons
+        or overall_distance > _GRAPHICAL_OUTPUT_DISTANCE_THRESHOLD
+    ):
         if (
             len(sorted_columns) * _MIN_GRAPH_POINTS_PER_SERIES
             > _MAX_GRAPH_POINTS_PER_COMPARISON
@@ -1061,6 +1065,7 @@ def compare_all_outputs(
     *,
     progress_callback: ProgressCallback | None = None,
     retain_graphical: bool = True,
+    include_all_comparisons: bool = False,
 ) -> list[OutputComparison]:
     comparisons: list[OutputComparison] = []
     grouped: dict[str, list[EngineResult]] = {}
@@ -1161,6 +1166,7 @@ def compare_all_outputs(
                         progress_callback=progress_callback,
                         retain_tabular=False,
                         retain_graphical=retain_graphical,
+                        include_all_comparisons=include_all_comparisons,
                     )
                 )
                 status = "completed"

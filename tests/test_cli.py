@@ -12,6 +12,7 @@ from typer.testing import CliRunner
 from swmm.pandas import example_out_path
 
 from swmm_bench.cli import app, test_app as regression_app
+from swmm_bench.models import OutputComparison, OutputSeriesComparison
 
 
 class RegressionCliTests(unittest.TestCase):
@@ -132,11 +133,52 @@ class BenchmarkCliTests(unittest.TestCase):
             )
             (case_directory / "result.rpt").write_text("report\n", encoding="utf-8")
 
+            def compare_outputs(
+                *_args: object,
+                retain_graphical: bool = True,
+                include_all_comparisons: bool = False,
+                **_kwargs: object,
+            ) -> list[OutputComparison]:
+                include_details = retain_graphical and include_all_comparisons
+                return [
+                    OutputComparison(
+                        inp_path="model-a",
+                        inp_name="model-a",
+                        engine_a="fake-swmm-a",
+                        engine_b="fake-swmm-b",
+                        overall_distance=0.0,
+                        section_comparisons=[],
+                        graphical_series=[
+                            OutputSeriesComparison(
+                                element_type="node",
+                                element_name="J1",
+                                attribute="depth",
+                                distance=0.0,
+                                row_count_a=1,
+                                row_count_b=1,
+                                timestamps=["2026-08-03T00:00:00"],
+                                values_a=[1.0],
+                                values_b=[1.0],
+                                source_point_count=1,
+                            )
+                        ]
+                        if include_details
+                        else [],
+                        details_retained=include_details,
+                    )
+                ]
+
             with patch(
-                "swmm_bench.cli.compare_all_outputs", return_value=[]
-            ) as compare_outputs:
+                "swmm_bench.cli.compare_all_outputs", side_effect=compare_outputs
+            ) as compare_outputs_mock:
                 rebuild_result = self.runner.invoke(
-                    app, ["rebuild", str(run_directory), "--outputs"]
+                    app,
+                    [
+                        "rebuild",
+                        str(run_directory),
+                        "--outputs",
+                        "--all-comparisons",
+                    ],
                 )
 
             self.assertEqual(rebuild_result.exit_code, 0, rebuild_result.output)
@@ -149,8 +191,14 @@ class BenchmarkCliTests(unittest.TestCase):
             self.assertEqual(data["name"], "previous-run")
             self.assertEqual(data["engine_results"][0]["engine_name"], "fake-swmm")
             self.assertEqual(data["engine_results"][0]["inp_name"], "model-a")
-            self.assertEqual(data["output_comparisons"], [])
-            self.assertFalse(compare_outputs.call_args.kwargs["retain_graphical"])
+            self.assertEqual(len(data["output_comparisons"][0]["graphical_series"]), 1)
+            self.assertTrue(data["output_comparisons"][0]["details_retained"])
+            self.assertNotIn(
+                "retain_graphical", compare_outputs_mock.call_args.kwargs
+            )
+            self.assertTrue(
+                compare_outputs_mock.call_args.kwargs["include_all_comparisons"]
+            )
 
             report_html = root / "report.html"
             report_result = self.runner.invoke(
@@ -159,6 +207,14 @@ class BenchmarkCliTests(unittest.TestCase):
 
             self.assertEqual(report_result.exit_code, 0, report_result.output)
             self.assertTrue(report_html.exists())
+            report_text = report_html.read_text(encoding="utf-8")
+            self.assertNotIn(
+                "Detailed output comparison data was not saved.", report_text
+            )
+            self.assertNotIn(
+                "0.000000 hidden as matching (≤0.010000)", report_text
+            )
+            self.assertIn("data-output-series-data", report_text)
 
     def test_run_records_output_comparisons_without_report_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

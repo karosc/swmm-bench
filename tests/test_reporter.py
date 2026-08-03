@@ -210,7 +210,6 @@ class ReporterTests(unittest.TestCase):
         self.assertIn("<th>Table</th>", html)
         self.assertNotIn("<th>Series</th>", html)
         self.assertNotIn(">Tabular</button>", html)
-        self.assertNotIn('role="tablist"', html)
         self.assertIn("1 plotted series", html)
         self.assertIn("Element type", html)
         self.assertIn("Search element or attribute", html)
@@ -328,6 +327,61 @@ class ReporterTests(unittest.TestCase):
         self.assertIn("summary-only-output.inp", html)
         self.assertIn("0.001000 hidden as matching (≤0.010000)", html)
         self.assertNotIn("summary-only-series", html)
+
+    def test_report_controls_follow_engine_order_and_use_tabs(self) -> None:
+        def engine(name: str) -> EngineResult:
+            return EngineResult(
+                engine_path=f"/{name}",
+                engine_name=name,
+                inp_path="model.inp",
+                inp_name="model.inp",
+                duration_s=1.0,
+                peak_memory_mb=1.0,
+                exit_code=0,
+                rpt_path=f"/tmp/{name}.rpt",
+                stdout="",
+                stderr="",
+                error=None,
+                out_path=None,
+            )
+
+        result = BenchmarkResult(
+            schema_version="5",
+            name="ordered-controls",
+            timestamp="2026-08-03T00:00:00+00:00",
+            platform={},
+            engine_results=[engine("runswmm"), engine("openswmm")],
+            comparisons=[
+                ModelComparison(
+                    inp_path="model.inp",
+                    inp_name="model.inp",
+                    engine_a="runswmm",
+                    engine_b="openswmm",
+                    overall_distance=0.2,
+                    section_comparisons=[],
+                    report_warnings=["WARNING 09: timestep reduced"],
+                )
+            ],
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output = Path(temporary_directory) / "report.html"
+            render_html(result, output)
+            html = output.read_text(encoding="utf-8")
+
+        overview_data = html.split('id="distance-overview-data">', 1)[1].split(
+            "</script>", 1
+        )[0]
+        distance_kind = html.split("<select data-distance-kind>", 1)[1].split(
+            "</select>", 1
+        )[0]
+        self.assertIn('"engines": ["runswmm", "openswmm"]', overview_data)
+        self.assertLess(
+            distance_kind.index('value="Output"'),
+            distance_kind.index('value="Report"'),
+        )
+        self.assertIn('role="tablist"', html)
+        self.assertIn('data-comparison-tab="comparison"', html)
+        self.assertIn('data-comparison-tab-panel="diagnostics"', html)
 
     def test_html_retains_all_above_threshold_output_graphs(self) -> None:
         comparisons = [
