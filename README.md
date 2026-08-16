@@ -7,8 +7,8 @@ Benchmark and regression-test compatible [SWMM](https://www.epa.gov/water-resear
 > [!IMPORTANT]
 > **EPA SWMM test coverage:** [view the latest report](http://karosc.github.io/swmm-bench/epa-swmm-coverage.html).
 >
-> The regression suite covers broad solver behavior, but the [largest gaps](docs/epa-coverage-analysis.md) 
-> are specialized hydraulic regimes and numerical boundaries: cross-section geometry, inlet and roadway 
+> The regression suite covers broad solver behavior, but the [largest gaps](docs/epa-coverage-analysis.md)
+> are specialized hydraulic regimes and numerical boundaries: cross-section geometry, inlet and roadway
 > routing, LID/groundwater states, and external-interface formats. Input validation, compatibility, and
 > other error paths are also incomplete.
 
@@ -63,6 +63,7 @@ Run one or more engines against input files. Omit `--inp` to use the bundled lon
 uv run swmm-bench run /path/to/swmm-a /path/to/swmm-b \
   --inp model.inp \
   --threads 4 \
+  --variable-step 0.5 \
   --timeout 600 \
   --output-dir results \
   --name baseline
@@ -74,6 +75,7 @@ uv run swmm-bench run /path/to/swmm-a /path/to/swmm-b \
 | `--recursive` | Search supplied directories recursively. |
 | `--pattern TEXT` | Input-file glob; defaults to `*.inp`. |
 | `--threads N` | Threads used by each engine run; defaults to `1`. |
+| `--variable-step VALUE` | Override the model's `VARIABLE_STEP`; preserve it when omitted. |
 | `--timeout SECONDS` | Per-run timeout; defaults to `300`. |
 | `--output-dir PATH` | Results parent directory; defaults to `swmm-bench-results`. |
 | `--name TEXT` | Name for this run directory. |
@@ -97,7 +99,7 @@ uv run swmm-test run /path/to/swmm-a /path/to/swmm-b \
   --model water-quality/waterquality-events_example.inp
 ```
 
-`swmm-test run` accepts `--threads`, `--timeout`, `--output-dir`, `--name`, `--html / --no-html`, and `--json-out`. Its default results parent is `swmm-test-results`.
+`swmm-test run` accepts `--threads`, `--variable-step`, `--timeout`, `--output-dir`, `--name`, `--html / --no-html`, and `--json-out`. Its default results parent is `swmm-test-results`.
 
 ### `swmm-test interface`
 
@@ -112,7 +114,7 @@ uv run swmm-test interface /path/to/source-swmm /path/to/target-swmm \
   --family rainfall --family hotstart
 ```
 
-The command retains generated interfaces and records each path, size, and SHA-256 in `results.json`. A failed engine, missing interface, or empty interface produces a nonzero exit after reports are written.
+The command accepts `--threads` and `--variable-step` overrides for every engine run. It retains generated interfaces and records each path, size, and SHA-256 in `results.json`. A failed engine, missing interface, or empty interface produces a nonzero exit after reports are written.
 
 ### Rebuild or render reports
 

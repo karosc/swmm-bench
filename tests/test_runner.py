@@ -4,7 +4,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from swmm_bench.runner import _copy_model_tree, _set_threads, run_benchmark
+from swmm_bench.runner import (
+    _copy_model_tree,
+    _set_threads,
+    _set_variable_step,
+    run_benchmark,
+)
 
 
 class RunBenchmarkTests(unittest.TestCase):
@@ -42,10 +47,12 @@ class RunBenchmarkTests(unittest.TestCase):
                 output_root / "bench" / engine_path.name / inp_path.name / "model"
             )
             self.assertIsNone(results[0].error)
-            self.assertIsNotNone(results[0].out_path)
-            self.assertEqual(Path(results[0].out_path).read_bytes(), b"output")
+            out_path = results[0].out_path
+            self.assertIsNotNone(out_path)
+            assert out_path is not None
+            self.assertEqual(Path(out_path).read_bytes(), b"output")
             self.assertEqual(
-                Path(results[0].out_path).name,
+                Path(out_path).name,
                 "result.out",
             )
             self.assertEqual(
@@ -193,6 +200,61 @@ class RunBenchmarkTests(unittest.TestCase):
             self.assertEqual(
                 inp_path.read_text(encoding="utf-8"),
                 "[OPTIONS]\nTHREADS              2\n\n[EVENT]\n01/01/2020 1\n",
+            )
+
+    def test_variable_step_override_handles_comments_duplicates_and_crlf(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            inp_path = Path(temporary_directory) / "Model.inp"
+            inp_path.write_bytes(
+                b"[OPTIONS] ; settings\r\n"
+                b"VARIABLE_STEP 0.75 ; first\r\n"
+                b"VARIABLE_STEP 0.25\r\n"
+                b"\r\n[EVENT]\r\n01/01/2020 1\r\n"
+            )
+
+            _set_variable_step(inp_path, 0.5)
+
+            self.assertEqual(
+                inp_path.read_bytes(),
+                b"[OPTIONS] ; settings\r\n"
+                b"VARIABLE_STEP 0.5 ; first\r\n"
+                b"VARIABLE_STEP 0.5\r\n"
+                b"\r\n[EVENT]\r\n01/01/2020 1\r\n",
+            )
+
+    def test_variable_step_override_does_not_rewrite_the_rest_of_the_model(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            inp_path = Path(temporary_directory) / "Model.inp"
+            inp_path.write_text(
+                "[OPTIONS]\nVARIABLE_STEP        0.75\n\n[EVENT]\n01/01/2020 1\n",
+                encoding="utf-8",
+            )
+
+            _set_variable_step(inp_path, 0.0)
+
+            self.assertEqual(
+                inp_path.read_text(encoding="utf-8"),
+                "[OPTIONS]\nVARIABLE_STEP        0.0\n\n[EVENT]\n01/01/2020 1\n",
+            )
+
+    def test_variable_step_override_adds_missing_option(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            inp_path = Path(temporary_directory) / "Model.inp"
+            inp_path.write_text(
+                "[OPTIONS]\nFLOW_UNITS CFS\n\n[EVENT]\n01/01/2020 1\n",
+                encoding="utf-8",
+            )
+
+            _set_variable_step(inp_path, 0.25)
+
+            self.assertEqual(
+                inp_path.read_text(encoding="utf-8"),
+                "[OPTIONS]\nVARIABLE_STEP        0.25\nFLOW_UNITS CFS\n\n"
+                "[EVENT]\n01/01/2020 1\n",
             )
 
 

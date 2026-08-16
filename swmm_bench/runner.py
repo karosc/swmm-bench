@@ -9,8 +9,8 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-import psutil
-from swmm.pandas import Report
+import psutil  # pyright: ignore[reportMissingModuleSource]
+from swmm.pandas import Report  # pyright: ignore[reportMissingImports]
 
 from swmm_bench.models import EngineResult
 
@@ -82,28 +82,44 @@ def _copy_model_tree(
     return copied_inp
 
 
-def _set_threads(inp_path: Path, threads: int) -> None:
-    text = inp_path.read_text(encoding="utf-8")
-    options = re.search(r"(?ims)^\[OPTIONS\][ \t]*$.*?(?=^\[|\Z)", text)
+def _set_option(inp_path: Path, option_name: str, value: int | float) -> None:
+    with inp_path.open("r", encoding="utf-8", newline="") as inp_file:
+        text = inp_file.read()
+    options = re.search(
+        r"(?ims)^\[OPTIONS\][ \t]*(?:;[^\r\n]*)?(?=\r?$).*?(?=^\[|\Z)",
+        text,
+    )
     if options is None:
         return
     section, replacements = re.subn(
-        r"(?im)^([ \t]*THREADS[ \t]+)\d+[ \t]*$",
-        rf"\g<1>{threads}",
+        rf"(?im)^([ \t]*{re.escape(option_name)}[ \t]+)\S+"
+        r"([ \t]*(?:;[^\r\n]*)?)(?=\r?$)",
+        rf"\g<1>{value}\g<2>",
         options.group(),
-        count=1,
     )
     if replacements == 0:
-        section = re.sub(
-            r"(?im)^(\[OPTIONS\][ \t]*)$",
-            rf"\1\nTHREADS              {threads}",
+        header = re.search(
+            r"(?im)^\[OPTIONS\][ \t]*(?:;[^\r\n]*)?(?=\r?$)",
             section,
-            count=1,
         )
-    inp_path.write_text(
-        text[: options.start()] + section + text[options.end() :],
-        encoding="utf-8",
-    )
+        if header is None:
+            raise ValueError("Matched [OPTIONS] section has no valid section header")
+        newline = "\r\n" if "\r\n" in text else "\n"
+        section = (
+            section[: header.end()]
+            + f"{newline}{option_name:<20} {value}"
+            + section[header.end() :]
+        )
+    with inp_path.open("w", encoding="utf-8", newline="") as inp_file:
+        inp_file.write(text[: options.start()] + section + text[options.end() :])
+
+
+def _set_threads(inp_path: Path, threads: int) -> None:
+    _set_option(inp_path, "THREADS", threads)
+
+
+def _set_variable_step(inp_path: Path, variable_step: float) -> None:
+    _set_option(inp_path, "VARIABLE_STEP", variable_step)
 
 
 def run_engine(
@@ -115,6 +131,7 @@ def run_engine(
     inp_identity: str | None = None,
     engine_name: str | None = None,
     threads: int = 1,
+    variable_step: float | None = None,
     excluded_roots: tuple[Path, ...] = (),
 ) -> EngineResult:
     engine = Path(engine_path).expanduser().resolve()
@@ -130,6 +147,8 @@ def run_engine(
         excluded_roots=excluded_roots,
     )
     _set_threads(copied_inp, threads)
+    if variable_step is not None:
+        _set_variable_step(copied_inp, variable_step)
     execution_cwd = case_dir / "model"
 
     rpt_candidate = case_dir / "raw.rpt"
@@ -181,6 +200,7 @@ def run_engine(
         try:
             stdout, stderr = process.communicate(timeout=timeout)
             exit_code = process.returncode
+        # pi-lens-ignore: ast-grep:no-bare-except
         except subprocess.TimeoutExpired:
             process.kill()
             stdout, stderr = process.communicate()
@@ -232,6 +252,7 @@ def run_benchmark(
     benchmark_name: str,
     timeout: float | None,
     threads: int = 1,
+    variable_step: float | None = None,
     progress_callback: Callable[[EngineResult], None] | None = None,
     inp_names: dict[Path, str] | None = None,
     inp_identities: dict[Path, str] | None = None,
@@ -266,6 +287,7 @@ def run_benchmark(
                 inp_name=display_name,
                 inp_identity=inp_identity,
                 threads=threads,
+                variable_step=variable_step,
                 excluded_roots=(work_dir,),
             )
             results.append(result)

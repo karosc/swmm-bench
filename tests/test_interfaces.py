@@ -7,8 +7,11 @@ import unittest
 from collections import Counter
 from pathlib import Path
 
-from swmm.pandas import example_out_path, example_rpt_path
-from typer.testing import CliRunner
+from swmm.pandas import (  # pyright: ignore[reportMissingImports]
+    example_out_path,
+    example_rpt_path,
+)
+from typer.testing import CliRunner  # pyright: ignore[reportMissingImports]
 
 from swmm_bench.cli import app, test_app as regression_app
 
@@ -70,6 +73,8 @@ class InterfaceWorkflowTests(unittest.TestCase):
                     str(target_b),
                     "--family",
                     "routing",
+                    "--variable-step",
+                    "0.5",
                     "--name",
                     "interface-test",
                     "--output-dir",
@@ -79,6 +84,14 @@ class InterfaceWorkflowTests(unittest.TestCase):
 
             self.assertEqual(result.exit_code, 0, result.output)
             result_dir = output_dir / "interface-test"
+            staged_inputs = list(result_dir.glob("**/model/*.inp"))
+            overridden_inputs = [
+                staged_input
+                for staged_input in staged_inputs
+                if "VARIABLE_STEP        0.5"
+                in staged_input.read_text(encoding="utf-8")
+            ]
+            self.assertEqual(len(overridden_inputs), 5)
             results_json = result_dir / "results.json"
             data = json.loads(results_json.read_text(encoding="utf-8"))
             self.assertEqual(data["schema_version"], "6")

@@ -10,7 +10,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-import typer
+import typer  # pyright: ignore[reportMissingImports]
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
@@ -91,6 +91,7 @@ def _execute_benchmark(
     timeout: float,
     html: bool,
     threads: int,
+    variable_step: float | None,
     json_out: Path | None,
     inp_names: dict[Path, str] | None = None,
     inp_identities: dict[Path, str] | None = None,
@@ -121,6 +122,7 @@ def _execute_benchmark(
             benchmark_name=benchmark_name,
             timeout=timeout,
             threads=threads,
+            variable_step=variable_step,
             progress_callback=lambda _result: progress.advance(run_task),
             inp_names=inp_names,
             inp_identities=inp_identities,
@@ -280,6 +282,12 @@ def run(
     threads: int = typer.Option(
         1, "--threads", help="Number of threads to use per run."
     ),
+    variable_step: float | None = typer.Option(
+        None,
+        "--variable-step",
+        help="Override the model's VARIABLE_STEP option.",
+        show_default=False,
+    ),
     recursive: bool = typer.Option(
         False, "--recursive", help="Recurse into directories looking for models."
     ),
@@ -311,6 +319,7 @@ def run(
             output_dir=output_dir,
             timeout=timeout,
             threads=threads,
+            variable_step=variable_step,
             html=html,
             json_out=json_out,
         )
@@ -327,6 +336,7 @@ def run(
             output_dir=output_dir,
             timeout=timeout,
             threads=threads,
+            variable_step=variable_step,
             html=html,
             json_out=json_out,
             inp_names={
@@ -417,16 +427,15 @@ def rebuild(
         console=console,
     ) as progress:
         report_task = progress.add_task("Comparing reports", total=max(pair_total, 1))
-        if outputs:
-            output_load_task = progress.add_task(
-                "Loading binary outputs", total=1, visible=False
-            )
-            output_pair_task = progress.add_task(
-                "Comparing binary outputs", total=max(pair_total, 1)
-            )
-            output_detail_task = progress.add_task(
-                "Comparing output series", total=1, visible=False
-            )
+        output_load_task = progress.add_task(
+            "Loading binary outputs", total=1, visible=False
+        )
+        output_pair_task = progress.add_task(
+            "Comparing binary outputs", total=max(pair_total, 1), visible=outputs
+        )
+        output_detail_task = progress.add_task(
+            "Comparing output series", total=1, visible=False
+        )
 
         def comparison_progress(event: ComparisonProgress) -> None:
             pair_label = ""
@@ -552,6 +561,12 @@ def run_suite(
     threads: int = typer.Option(
         1, "--threads", help="Number of threads to use per run."
     ),
+    variable_step: float | None = typer.Option(
+        None,
+        "--variable-step",
+        help="Override the model's VARIABLE_STEP option.",
+        show_default=False,
+    ),
     timeout: float = typer.Option(
         300.0, "--timeout", help="Per-run timeout in seconds."
     ),
@@ -587,6 +602,7 @@ def run_suite(
             output_dir=output_dir,
             timeout=timeout,
             threads=threads,
+            variable_step=variable_step,
             html=html,
             json_out=json_out,
             inp_names=inp_names,
@@ -618,6 +634,12 @@ def run_interfaces(
         1,
         "--threads",
         help="Number of threads to use per engine run.",
+    ),
+    variable_step: float | None = typer.Option(
+        None,
+        "--variable-step",
+        help="Override the model's VARIABLE_STEP option.",
+        show_default=False,
     ),
     timeout: float = typer.Option(
         300.0,
@@ -662,6 +684,7 @@ def run_interfaces(
             name=run_name,
             timeout=timeout,
             threads=threads,
+            variable_step=variable_step,
             platform=_platform_info(),
             progress_callback=lambda _result: progress.advance(task),
         )
@@ -702,7 +725,12 @@ def report(
         False, "--open", help="Open the generated report in the default browser."
     ),
 ) -> None:
-    data = json.loads(results_json.expanduser().resolve().read_text(encoding="utf-8"))
+    try:
+        data = json.loads(
+            results_json.expanduser().resolve().read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError) as exc:
+        raise typer.BadParameter(f"Could not read results JSON: {exc}") from exc
     result = BenchmarkResult.from_dict(data)
     html_path = (
         output.expanduser().resolve()

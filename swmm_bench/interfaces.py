@@ -263,6 +263,7 @@ def run_interface_suite(
     timeout: float | None,
     threads: int,
     platform: dict[str, Any],
+    variable_step: float | None = None,
     progress_callback: Callable[[EngineResult], None] | None = None,
 ) -> BenchmarkResult:
     target_labels = _engine_labels(target_engines)
@@ -339,6 +340,7 @@ def run_interface_suite(
                 inp_name=f"{case.family}/generator",
                 inp_identity=generator_identity,
                 threads=threads,
+                variable_step=variable_step,
             )
             engine_results.append(generator_result)
             if progress_callback:
@@ -379,6 +381,7 @@ def run_interface_suite(
                     inp_name=f"{case.family}/interface-consumer",
                     inp_identity=consumer_identity,
                     threads=threads,
+                    variable_step=variable_step,
                     engine_name=target_label,
                 )
                 baseline = run_engine(
@@ -389,6 +392,7 @@ def run_interface_suite(
                     inp_name=f"{case.family}/direct-baseline",
                     inp_identity=baseline_identity,
                     threads=threads,
+                    variable_step=variable_step,
                     engine_name=target_label,
                 )
                 consumers.append(consumer)

@@ -8,8 +8,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from rich.text import Text
-from typer.testing import CliRunner
-from swmm.pandas import example_out_path
+from typer.testing import CliRunner  # pyright: ignore[reportMissingImports]
+from swmm.pandas import example_out_path  # pyright: ignore[reportMissingImports]
 
 from swmm_bench.cli import app, test_app as regression_app
 from swmm_bench.models import OutputComparison, OutputSeriesComparison
@@ -30,6 +30,26 @@ class RegressionCliTests(unittest.TestCase):
         self.assertIn("--category hydrology", plain_output)
         self.assertIn("--model", plain_output)
         self.assertIn("water-quality/waterquality-events_example.inp", plain_output)
+
+    def test_suite_run_forwards_variable_step_override(self) -> None:
+        with patch("swmm_bench.cli._execute_benchmark") as execute_benchmark:
+            result = self.runner.invoke(
+                regression_app,
+                [
+                    "run",
+                    "fake-swmm",
+                    "--model",
+                    "complex/rtk.inp",
+                    "--variable-step",
+                    "0",
+                ],
+            )
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(
+            execute_benchmark.call_args.kwargs["variable_step"],
+            0.0,
+        )
 
     def test_suite_run_records_stable_model_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -80,6 +100,30 @@ class RegressionCliTests(unittest.TestCase):
 class BenchmarkCliTests(unittest.TestCase):
     def setUp(self) -> None:
         self.runner = CliRunner()
+
+    def test_run_forwards_variable_step_override(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            inp_path = Path(temporary_directory) / "model.inp"
+            inp_path.write_text("[OPTIONS]\nVARIABLE_STEP 0.75\n", encoding="utf-8")
+
+            with patch("swmm_bench.cli._execute_benchmark") as execute_benchmark:
+                result = self.runner.invoke(
+                    app,
+                    [
+                        "run",
+                        "fake-swmm",
+                        "--inp",
+                        str(inp_path),
+                        "--variable-step",
+                        "0.25",
+                    ],
+                )
+
+            self.assertEqual(result.exit_code, 0, result.output)
+            self.assertEqual(
+                execute_benchmark.call_args.kwargs["variable_step"],
+                0.25,
+            )
 
     def test_run_uses_bundled_benchmarks_when_inp_is_omitted(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
