@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from swmm_bench.runner import (
     _copy_model_tree,
@@ -90,6 +91,43 @@ class RunBenchmarkTests(unittest.TestCase):
             )[0]
 
             self.assertEqual(result.duration_s, 2.0)
+
+    def test_duration_falls_back_to_command_duration_for_unparseable_reports(
+        self,
+    ) -> None:
+        report_bodies = (
+            "  Analysis complete.\n",
+            "  Total elapsed time: unavailable\n",
+        )
+        for index, report_body in enumerate(report_bodies):
+            with self.subTest(report_body=report_body):
+                with tempfile.TemporaryDirectory() as temporary_directory:
+                    root = Path(temporary_directory)
+                    inp_path = root / "Model.inp"
+                    inp_path.write_text("[TITLE]\n", encoding="utf-8")
+                    engine_path = root / "fake-swmm"
+                    engine_path.write_text(
+                        "#!/usr/bin/env python3\n"
+                        "import pathlib\n"
+                        "import sys\n"
+                        f"pathlib.Path(sys.argv[2]).write_text({report_body!r}, encoding='utf-8')\n",
+                        encoding="utf-8",
+                    )
+                    engine_path.chmod(0o755)
+
+                    with patch(
+                        "swmm_bench.runner.perf_counter",
+                        side_effect=(10.0 + index, 10.25 + index),
+                    ):
+                        result = run_benchmark(
+                            engines=[str(engine_path)],
+                            inp_files=[inp_path],
+                            work_dir=root / "results",
+                            benchmark_name="bench",
+                            timeout=5.0,
+                        )[0]
+
+                    self.assertEqual(result.duration_s, 0.25)
 
     def test_repeat_run_does_not_reuse_stale_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

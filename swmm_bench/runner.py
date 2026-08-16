@@ -8,6 +8,7 @@ import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
+from time import perf_counter
 
 import psutil  # pyright: ignore[reportMissingModuleSource]
 from swmm.pandas import Report  # pyright: ignore[reportMissingImports]
@@ -176,6 +177,7 @@ def run_engine(
     stderr = ""
     exit_code: int | None = None
     error: str | None = None
+    command_duration_s: float | None = None
     memory_thread: threading.Thread | None = None
 
     try:
@@ -184,6 +186,7 @@ def run_engine(
                 if artifact.is_symlink() or not artifact.is_file():
                     raise RuntimeError(f"Expected output artifact file at {artifact}")
                 artifact.unlink()
+        command_started_at = perf_counter()
         process = subprocess.Popen(
             [str(engine), str(copied_inp), str(rpt_candidate), str(out_candidate)],
             cwd=str(execution_cwd),
@@ -206,6 +209,7 @@ def run_engine(
             stdout, stderr = process.communicate()
             exit_code = process.returncode
             error = f"Timed out after {timeout} seconds"
+        command_duration_s = perf_counter() - command_started_at
     except OSError as exc:
         error = str(exc)
     finally:
@@ -222,6 +226,8 @@ def run_engine(
         shutil.copy2(rpt_candidate, final_rpt)
         rpt_path = str(final_rpt.resolve())
         duration_s = _analysis_duration_seconds(final_rpt)
+        if duration_s is None:
+            duration_s = command_duration_s
     elif error is None:
         error = "Engine did not produce a non-empty report file"
 
