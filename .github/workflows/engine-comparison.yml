@@ -166,7 +166,7 @@ jobs:
         continue-on-error: true
         run: |
           uv run swmm-test run \
-          --threads 2 \
+          --threads 4 \
           --variable-step 0 \
           --name "${{ inputs.run_name }}" \
           build/epa-swmm/src/run/epaswmm \
@@ -178,7 +178,7 @@ jobs:
       - name: Run benchmarks
         run: |
           uv run swmm-bench run \
-          --threads 2 \
+          --threads 4 \
           --variable-step 0 \
           --name "${{ inputs.run_name }}" \
           build/epa-swmm/src/run/epaswmm \
