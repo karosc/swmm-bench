@@ -20,7 +20,8 @@ from swmm_bench.comparator import (
     compare_all,
     compare_rpts,
 )
-from swmm_bench.models import EngineResult
+from swmm_bench.models import BenchmarkResult, EngineResult, ModelComparison
+from swmm_bench.reporter import save_json
 
 
 class CellDistanceTests(unittest.TestCase):
@@ -140,6 +141,39 @@ class TableDistanceTests(unittest.TestCase):
         self.assertEqual(comparisons[0].difference_count, 101)
         self.assertEqual(len(comparisons[0].differences), 100)
         self.assertTrue(comparisons[0].differences_truncated)
+
+    def test_nonfinite_report_diagnostics_remain_json_safe(self) -> None:
+        left = DataFrame(
+            {"value": [math.inf, 1e308]}, index=["infinite", "overflow"]
+        )
+        right = DataFrame(
+            {"value": [1.0, -1e308]}, index=["infinite", "overflow"]
+        )
+        sections, overall_distance = _compare_tables({"summary": left}, {"summary": right})
+        comparison = ModelComparison(
+            inp_path="model.inp",
+            inp_name="model.inp",
+            engine_a="a",
+            engine_b="b",
+            overall_distance=overall_distance,
+            section_comparisons=sections,
+        )
+        result = BenchmarkResult(
+            schema_version="5",
+            name="nonfinite-report-values",
+            timestamp="2026-08-18T00:00:00+00:00",
+            platform={},
+            engine_results=[],
+            comparisons=[comparison],
+        )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output = Path(temporary_directory) / "results.json"
+            save_json(result, output)
+
+        self.assertEqual(sections[0].distance, 1.0)
+        self.assertIsNone(sections[0].differences[0]["value_a"])
+        self.assertIsNone(sections[0].differences[1]["abs_diff"])
 
     def test_duplicate_labels_are_rejected(self) -> None:
         duplicate_rows = DataFrame(

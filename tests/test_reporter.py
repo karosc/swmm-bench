@@ -3,7 +3,11 @@ from __future__ import annotations
 import math
 import tempfile
 import unittest
+from io import StringIO
 from pathlib import Path
+from unittest.mock import Mock, patch
+
+from rich.console import Console
 
 from swmm_bench.models import (
     BenchmarkResult,
@@ -16,10 +20,59 @@ from swmm_bench.models import (
     OutputTimelineCoverage,
     SectionComparison,
 )
-from swmm_bench.reporter import render_html, save_json
+from swmm_bench.reporter import print_summary, render_html, save_json
 
 
 class ReporterTests(unittest.TestCase):
+    def test_timing_highlights_exclude_failed_analyses(self) -> None:
+        def engine_result(
+            engine_name: str,
+            model_name: str,
+            duration_s: float,
+            exit_code: int,
+            error: str | None = None,
+        ) -> EngineResult:
+            return EngineResult(
+                engine_path=f"/{engine_name}",
+                engine_name=engine_name,
+                inp_path=model_name,
+                inp_name=model_name,
+                duration_s=duration_s,
+                peak_memory_mb=1.0,
+                exit_code=exit_code,
+                rpt_path=None,
+                stdout="",
+                stderr="failed" if exit_code or error else "",
+                error=error,
+            )
+
+        result = BenchmarkResult(
+            schema_version="5",
+            name="failed-timing",
+            timestamp="2026-07-20T00:00:00+00:00",
+            platform={"host": "test", "os": "test", "python": "test"},
+            engine_results=[
+                engine_result("failed-fast", "mixed.inp", 0.25, 1),
+                engine_result("completed", "mixed.inp", 1.0, 0),
+                engine_result(
+                    "failed-only", "failed-only.inp", 0.5, 0, "analysis failed"
+                ),
+            ],
+            comparisons=[],
+        )
+        mocked_console = Mock()
+        with patch("swmm_bench.reporter.console", mocked_console):
+            print_summary(result)
+
+        speed_table = mocked_console.print.call_args_list[1].args[0]
+        output = StringIO()
+        Console(file=output, width=120).print(speed_table)
+        highlights = output.getvalue()
+
+        self.assertIn("completed (1.000s)", highlights)
+        self.assertNotIn("failed-fast", highlights)
+        self.assertNotIn("failed-only.inp", highlights)
+
     def test_duration_label_tracks_schema_semantics(self) -> None:
         for schema_version, expected in (
             ("4", "Average runtime by engine"),

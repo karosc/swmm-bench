@@ -5,6 +5,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from swmm_bench.models import BenchmarkResult
+from swmm_bench.reporter import save_json
 from swmm_bench.runner import (
     _copy_model_tree,
     _set_threads,
@@ -129,6 +131,55 @@ class RunBenchmarkTests(unittest.TestCase):
 
                     self.assertEqual(result.duration_s, 0.25)
 
+    def test_nonfinite_report_duration_falls_back_and_remains_json_safe(self) -> None:
+        class NonFiniteDuration:
+            def total_seconds(self) -> float:
+                return float("nan")
+
+        class NonFiniteReport:
+            analysis_duration = NonFiniteDuration()
+
+            def __init__(self, _path: str) -> None:
+                pass
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            inp_path = root / "Model.inp"
+            inp_path.write_text("[TITLE]\n", encoding="utf-8")
+            engine_path = root / "fake-swmm"
+            engine_path.write_text(
+                "#!/usr/bin/env python3\n"
+                "import pathlib\n"
+                "import sys\n"
+                "pathlib.Path(sys.argv[2]).write_text('report\\n', encoding='utf-8')\n",
+                encoding="utf-8",
+            )
+            engine_path.chmod(0o755)
+
+            with (
+                patch("swmm_bench.runner.Report", NonFiniteReport),
+                patch("swmm_bench.runner.perf_counter", side_effect=(10.0, 10.25)),
+            ):
+                result = run_benchmark(
+                    engines=[str(engine_path)],
+                    inp_files=[inp_path],
+                    work_dir=root / "results",
+                    benchmark_name="bench",
+                    timeout=5.0,
+                )[0]
+
+            benchmark = BenchmarkResult(
+                schema_version="5",
+                name="nonfinite-duration",
+                timestamp="2026-08-18T00:00:00+00:00",
+                platform={},
+                engine_results=[result],
+                comparisons=[],
+            )
+            save_json(benchmark, root / "results.json")
+
+            self.assertEqual(result.duration_s, 0.25)
+
     def test_failed_run_does_not_fall_back_to_command_duration(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -220,6 +271,7 @@ class RunBenchmarkTests(unittest.TestCase):
             )
             engine_path.chmod(0o755)
 
+            started_runs = []
             results = run_benchmark(
                 engines=[str(engine_path)],
                 inp_files=[inp_path],
@@ -228,8 +280,12 @@ class RunBenchmarkTests(unittest.TestCase):
                 timeout=5.0,
                 inp_names={inp_path: "suite/Model.inp"},
                 inp_identities={inp_path: "bundled://regression-suite/suite/Model.inp"},
+                run_started_callback=lambda engine_name, inp_name: started_runs.append(
+                    (engine_name, inp_name)
+                ),
             )
 
+            self.assertEqual(started_runs, [("fake-swmm", "suite/Model.inp")])
             self.assertEqual(results[0].inp_name, "suite/Model.inp")
             self.assertEqual(
                 results[0].inp_path, "bundled://regression-suite/suite/Model.inp"

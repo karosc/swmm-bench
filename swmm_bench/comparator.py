@@ -140,6 +140,12 @@ def _json_value(value: Any) -> Any:
         value = value.item()
     if hasattr(value, "isoformat"):
         return value.isoformat()
+    if isinstance(value, numbers.Real) and not isinstance(value, numbers.Integral):
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        return numeric if math.isfinite(numeric) else None
     return value
 
 
@@ -193,7 +199,7 @@ def _compare_table(
                         "column": _json_value(column),
                         "value_a": _json_value(value_a),
                         "value_b": _json_value(value_b),
-                        "abs_diff": absolute,
+                        "abs_diff": _json_value(absolute),
                         "rel_diff": distance,
                     }
                 )

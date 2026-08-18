@@ -40,3 +40,9 @@ swmm_bench = [
     "resources/benchmarks/**/*.dat",
     "resources/benchmarks/**/*.bin",
 ]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.3.0",
+    "ipython>=9.16.1",
+]

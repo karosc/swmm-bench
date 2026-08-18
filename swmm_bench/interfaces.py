@@ -268,7 +268,9 @@ def run_interface_suite(
     platform: dict[str, Any],
     variable_step: float | None = None,
     progress_callback: Callable[[EngineResult], None] | None = None,
+    run_started_callback: Callable[[str, str], None] | None = None,
 ) -> BenchmarkResult:
+    source_label = Path(source_engine).expanduser().resolve().name
     target_labels = _engine_labels(target_engines)
     cases = select_interface_cases(families)
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -335,6 +337,8 @@ def run_interface_suite(
             generator_identity = f"interface://{case.family}/generator"
             consumer_identity = f"interface://{case.family}/consumer"
             baseline_identity = f"interface://{case.family}/baseline"
+            if run_started_callback:
+                run_started_callback(source_label, f"{case.family}/generator")
             generator_result = run_engine(
                 source_engine,
                 source_inp,
@@ -376,6 +380,10 @@ def run_interface_suite(
             for target_engine, target_label in zip(
                 target_engines, target_labels, strict=True
             ):
+                if run_started_callback:
+                    run_started_callback(
+                        target_label, f"{case.family}/interface-consumer"
+                    )
                 consumer = run_engine(
                     target_engine,
                     consumer_inp,
@@ -387,6 +395,12 @@ def run_interface_suite(
                     variable_step=variable_step,
                     engine_name=target_label,
                 )
+                if progress_callback:
+                    progress_callback(consumer)
+                if run_started_callback:
+                    run_started_callback(
+                        target_label, f"{case.family}/direct-baseline"
+                    )
                 baseline = run_engine(
                     target_engine,
                     baseline_inp,
@@ -398,12 +412,11 @@ def run_interface_suite(
                     variable_step=variable_step,
                     engine_name=target_label,
                 )
+                if progress_callback:
+                    progress_callback(baseline)
                 consumers.append(consumer)
                 baselines.append(baseline)
                 engine_results.extend((consumer, baseline))
-                if progress_callback:
-                    progress_callback(consumer)
-                    progress_callback(baseline)
 
             comparison_results.extend(
                 result for result in (*consumers, *baselines) if _successful(result)

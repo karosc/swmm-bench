@@ -139,9 +139,12 @@ def print_summary(result: BenchmarkResult) -> None:
     speed_table.add_column("Slowest")
 
     for model_name, rows in sorted(by_model.items()):
-        completed = [row for row in rows if row.duration_s is not None]
+        completed = [
+            row
+            for row in rows
+            if row.exit_code == 0 and row.error is None and row.duration_s is not None
+        ]
         if not completed:
-            speed_table.add_row(model_name, "-", "-")
             continue
         fastest = min(
             completed, key=lambda row: row.duration_s if row.duration_s is not None else inf

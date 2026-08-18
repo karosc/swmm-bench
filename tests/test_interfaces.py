@@ -7,6 +7,7 @@ import unittest
 from collections import Counter
 from pathlib import Path
 
+from rich.text import Text
 from swmm.pandas import (  # pyright: ignore[reportMissingImports]
     example_out_path,
     example_rpt_path,
@@ -14,6 +15,7 @@ from swmm.pandas import (  # pyright: ignore[reportMissingImports]
 from typer.testing import CliRunner  # pyright: ignore[reportMissingImports]
 
 from swmm_bench.cli import app, test_app as regression_app
+from swmm_bench.interfaces import run_interface_suite
 
 
 class InterfaceWorkflowTests(unittest.TestCase):
@@ -54,6 +56,44 @@ class InterfaceWorkflowTests(unittest.TestCase):
         engine.chmod(0o755)
         return engine
 
+    def test_run_callbacks_report_each_engine_and_model_in_order(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            source = self._engine(root, "source-swmm")
+            target = self._engine(root, "target-swmm")
+            events = []
+
+            run_interface_suite(
+                source_engine=str(source),
+                target_engines=[str(target)],
+                families=["routing"],
+                work_dir=root / "results",
+                name="callback-order",
+                timeout=5.0,
+                threads=1,
+                parse_workers=1,
+                output_workers=1,
+                platform={},
+                progress_callback=lambda result: events.append(
+                    ("completed", result.engine_name, result.inp_name)
+                ),
+                run_started_callback=lambda engine_name, inp_name: events.append(
+                    ("started", engine_name, inp_name)
+                ),
+            )
+
+        self.assertEqual(
+            events,
+            [
+                ("started", "source-swmm", "routing/generator"),
+                ("completed", "source-swmm", "routing/generator"),
+                ("started", "target-swmm", "routing/interface-consumer"),
+                ("completed", "target-swmm", "routing/interface-consumer"),
+                ("started", "target-swmm", "routing/direct-baseline"),
+                ("completed", "target-swmm", "routing/direct-baseline"),
+            ],
+        )
+
     def test_interface_command_runs_all_comparison_views_and_regenerates_report(
         self,
     ) -> None:
@@ -83,6 +123,11 @@ class InterfaceWorkflowTests(unittest.TestCase):
             )
 
             self.assertEqual(result.exit_code, 0, result.output)
+            plain_output = " ".join(Text.from_ansi(result.output).plain.split())
+            self.assertIn(
+                "Running interfaces: alternate/runswmm · routing/direct-baseline",
+                plain_output,
+            )
             result_dir = output_dir / "interface-test"
             staged_inputs = list(result_dir.glob("**/model/*.inp"))
             overridden_inputs = [
@@ -215,6 +260,9 @@ class InterfaceWorkflowTests(unittest.TestCase):
             )
 
             self.assertEqual(result.exit_code, 1, result.output)
+            plain_output = " ".join(Text.from_ansi(result.output).plain.split())
+            self.assertIn("4/4", plain_output)
+            self.assertNotIn("6/6", plain_output)
             data = json.loads(
                 (output_dir / "generator-failure" / "results.json").read_text(
                     encoding="utf-8"

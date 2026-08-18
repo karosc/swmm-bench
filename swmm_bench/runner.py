@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 import re
 import shutil
@@ -32,7 +33,8 @@ def _display_name(inp_path: Path) -> str:
 
 def _analysis_duration_seconds(rpt_path: Path) -> float | None:
     try:
-        return Report(str(rpt_path)).analysis_duration.total_seconds()
+        duration = Report(str(rpt_path)).analysis_duration.total_seconds()
+        return duration if math.isfinite(duration) else None
     except Exception:
         # A run can still produce a useful partial report without timing metadata.
         return None
@@ -262,6 +264,7 @@ def run_benchmark(
     progress_callback: Callable[[EngineResult], None] | None = None,
     inp_names: dict[Path, str] | None = None,
     inp_identities: dict[Path, str] | None = None,
+    run_started_callback: Callable[[str, str], None] | None = None,
 ) -> list[EngineResult]:
     results: list[EngineResult] = []
     resolved_names = {
@@ -284,7 +287,10 @@ def run_benchmark(
     benchmark_dir.mkdir(parents=True, exist_ok=True)
 
     for engine_path in engines:
+        engine_name = Path(engine_path).expanduser().resolve().name
         for display_name, inp_path, inp_identity in labelled_inputs:
+            if run_started_callback is not None:
+                run_started_callback(engine_name, display_name)
             result = run_engine(
                 engine_path=engine_path,
                 inp_path=inp_path,

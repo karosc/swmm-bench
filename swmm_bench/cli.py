@@ -114,6 +114,7 @@ def _execute_benchmark(
     )
 
     total_runs = len(validated_engines) * len(inp_files)
+    run_label = "tests" if default_name_prefix == "regression" else "benchmarks"
     html_path: Path | None = None
     with Progress(
         SpinnerColumn(),
@@ -122,7 +123,15 @@ def _execute_benchmark(
         TimeElapsedColumn(),
         console=console,
     ) as progress:
-        run_task = progress.add_task("Running benchmarks", total=total_runs)
+        run_task = progress.add_task(f"Running {run_label}", total=total_runs)
+
+        def run_started(engine_name: str, inp_name: str) -> None:
+            progress.update(
+                run_task,
+                description=f"Running {run_label}: {engine_name} · {inp_name}",
+            )
+            progress.refresh()
+
         engine_results = run_benchmark(
             engines=validated_engines,
             inp_files=inp_files,
@@ -132,6 +141,7 @@ def _execute_benchmark(
             threads=threads,
             variable_step=variable_step,
             progress_callback=lambda _result: progress.advance(run_task),
+            run_started_callback=run_started,
             inp_names=inp_names,
             inp_identities=inp_identities,
         )
@@ -745,6 +755,14 @@ def run_interfaces(
         console=console,
     ) as progress:
         task = progress.add_task("Running interface pipelines", total=total_runs)
+
+        def run_started(engine_name: str, inp_name: str) -> None:
+            progress.update(
+                task,
+                description=f"Running interfaces: {engine_name} · {inp_name}",
+            )
+            progress.refresh()
+
         result = run_interface_suite(
             source_engine=validated_source,
             target_engines=validated_targets,
@@ -758,8 +776,10 @@ def run_interfaces(
             variable_step=variable_step,
             platform=_platform_info(),
             progress_callback=lambda _result: progress.advance(task),
+            run_started_callback=run_started,
         )
-        progress.update(task, completed=total_runs)
+        actual_runs = len(result.engine_results)
+        progress.update(task, completed=actual_runs, total=max(actual_runs, 1))
 
     json_path = (
         json_out.expanduser().resolve() if json_out else result_dir / "results.json"

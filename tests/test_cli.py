@@ -89,6 +89,10 @@ class RegressionCliTests(unittest.TestCase):
             )
 
             self.assertEqual(result.exit_code, 0, result.output)
+            plain_output = " ".join(Text.from_ansi(result.output).plain.split())
+            self.assertIn(
+                "Running tests: fake-swmm · complex/rtk.inp", plain_output
+            )
             results_json = output_dir / "suite-test" / "results.json"
             data = json.loads(results_json.read_text(encoding="utf-8"))
             engine_result = data["engine_results"][0]
@@ -313,6 +317,10 @@ class BenchmarkCliTests(unittest.TestCase):
 
             self.assertEqual(result.exit_code, 0, result.output)
             plain_output = Text.from_ansi(result.output).plain
+            normalized_output = " ".join(plain_output.split())
+            self.assertIn(
+                "Running benchmarks: fake-swmm-b · Model.inp", normalized_output
+            )
             self.assertIn("Loading binary output", plain_output)
             self.assertNotIn("Preparing chart data", plain_output)
             self.assertIn("Writing JSON results", plain_output)
