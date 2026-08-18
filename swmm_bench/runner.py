@@ -226,7 +226,7 @@ def run_engine(
         shutil.copy2(rpt_candidate, final_rpt)
         rpt_path = str(final_rpt.resolve())
         duration_s = _analysis_duration_seconds(final_rpt)
-        if duration_s is None:
+        if duration_s is None and exit_code == 0 and error is None:
             duration_s = command_duration_s
     elif error is None:
         error = "Engine did not produce a non-empty report file"

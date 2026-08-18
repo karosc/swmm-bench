@@ -26,7 +26,7 @@ on:
       run_name:
         description: Name for the saved comparison results
         required: true
-        default: openswmm-vs-epa
+        default: engine-wars
         type: string
 
 permissions:
@@ -171,6 +171,7 @@ jobs:
           --name "${{ inputs.run_name }}" \
           build/epa-swmm/src/run/epaswmm \
           build/openswmm/src/cli/openswmm \
+          build/openswmm/src/cli/openswmm-legacy \
           build/swmmrs/runswmmrs \
           build/hydra/runhydra
 
@@ -182,6 +183,7 @@ jobs:
           --name "${{ inputs.run_name }}" \
           build/epa-swmm/src/run/epaswmm \
           build/openswmm/src/cli/openswmm \
+          build/openswmm/src/cli/openswmm-legacy \
           build/swmmrs/runswmmrs \
           build/hydra/runhydra
 
