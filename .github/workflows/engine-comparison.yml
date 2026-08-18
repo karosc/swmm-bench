@@ -168,6 +168,8 @@ jobs:
           uv run swmm-test run \
           --threads 4 \
           --variable-step 0 \
+          --timeout 900 \
+          --output-parse-workers 2 \
           --name "${{ inputs.run_name }}" \
           build/epa-swmm/src/run/epaswmm \
           build/openswmm/src/cli/openswmm \
@@ -180,6 +182,8 @@ jobs:
           uv run swmm-bench run \
           --threads 4 \
           --variable-step 0 \
+          --timeout 1800 \
+          --output-parse-workers 2 \
           --name "${{ inputs.run_name }}" \
           build/epa-swmm/src/run/epaswmm \
           build/openswmm/src/cli/openswmm \
