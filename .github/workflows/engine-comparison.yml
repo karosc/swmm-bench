@@ -171,7 +171,7 @@ jobs:
           --name "${{ inputs.run_name }}" \
           build/epa-swmm/src/run/epaswmm \
           build/openswmm/src/cli/openswmm \
-          build/openswmm/src/cli/openswmm-legacy \
+          build/openswmm/src/legacy/cli/openswmm-legacy \
           build/swmmrs/runswmmrs \
           build/hydra/runhydra
 
@@ -183,7 +183,7 @@ jobs:
           --name "${{ inputs.run_name }}" \
           build/epa-swmm/src/run/epaswmm \
           build/openswmm/src/cli/openswmm \
-          build/openswmm/src/cli/openswmm-legacy \
+          build/openswmm/src/legacy/cli/openswmm-legacy \
           build/swmmrs/runswmmrs \
           build/hydra/runhydra
 
