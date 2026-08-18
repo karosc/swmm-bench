@@ -309,7 +309,7 @@ class BenchmarkCliTests(unittest.TestCase):
             self.assertEqual(output_comparison["overall_distance"], 0.0)
             self.assertEqual(
                 output_comparison["metric"],
-                "normalized-rmse-missing-v1",
+                "normalized-rmse-shared-timeline-v2",
             )
             self.assertEqual(output_comparison["section_comparisons"], [])
             self.assertEqual(output_comparison["graphical_series"], [])

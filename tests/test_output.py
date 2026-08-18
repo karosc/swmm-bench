@@ -3,11 +3,18 @@ from __future__ import annotations
 import math
 import unittest
 from pathlib import Path
+from typing import cast
 from unittest.mock import patch
 
-from pandas import DataFrame, DatetimeIndex, MultiIndex, Timestamp, date_range
-from pandas.testing import assert_frame_equal
-from swmm.pandas import example_out_path
+from pandas import (  # pyright: ignore[reportMissingImports]
+    DataFrame,
+    DatetimeIndex,
+    MultiIndex,
+    Timestamp,
+    date_range,
+)
+from pandas.testing import assert_frame_equal  # pyright: ignore[reportMissingImports]
+from swmm.pandas import example_out_path  # pyright: ignore[reportMissingImports]
 
 from swmm_bench.comparator import (
     _MAX_GRAPH_POINTS_PER_SERIES,
@@ -131,16 +138,89 @@ class OutputExtractionTests(unittest.TestCase):
             (series.element_type, series.element_name, series.attribute),
             ("node", "J1", "hydraulic_head"),
         )
-        self.assertEqual(series.values_a, [1.0, 2.0, None])
-        self.assertEqual(series.values_b, [None, 2.5, 3.0])
+        self.assertEqual(series.values_a, [1.0, 2.0])
+        self.assertEqual(series.values_b, [None, 2.5])
         section = comparison.section_comparisons[0]
-        self.assertAlmostEqual(section.numeric_distance, 0.2)
-        self.assertAlmostEqual(section.missing_fraction, 2.0 / 3.0)
-        self.assertAlmostEqual(section.distance, 2.0 / 3.0 + (1.0 / 3.0) * 0.2)
+        self.assertIsNotNone(section.numeric_distance)
+        self.assertIsNotNone(section.missing_fraction)
+        self.assertAlmostEqual(cast(float, section.numeric_distance), 0.2)
+        self.assertAlmostEqual(cast(float, section.missing_fraction), 0.5)
+        self.assertAlmostEqual(section.distance, 0.5 + 0.5 * 0.2)
         self.assertEqual(section.finite_pair_count, 1)
-        self.assertEqual(section.missing_count, 2)
+        self.assertEqual(section.missing_count, 1)
+        self.assertEqual(comparison.timeline_coverage.trailing_timestamp_count_b, 1)
         self.assertEqual(series.distance, section.distance)
         self.assertFalse(series.sampled)
+
+    def test_trailing_periods_are_coverage_not_value_distance(self) -> None:
+        columns = MultiIndex.from_tuples(
+            [("node", "J1", "depth")],
+            names=["element_type", "element_name", "attribute"],
+        )
+        shared_index = date_range("2020-01-01", periods=3, freq="5min")
+        extended_index = date_range("2020-01-01", periods=6, freq="5min")
+        frame_a = DataFrame([1.0, 2.0, 3.0], index=shared_index, columns=columns)
+        frame_b = DataFrame(
+            [1.0, 2.0, 3.0, 40.0, 50.0, 60.0],
+            index=extended_index,
+            columns=columns,
+        )
+
+        forward = _compare_output_frames(frame_a, frame_b, "a", "b", "m", "m")
+        reverse = _compare_output_frames(frame_b, frame_a, "b", "a", "m", "m")
+        frame_b_with_shared_difference = frame_b.copy()
+        frame_b_with_shared_difference.iloc[1, 0] = 20.0
+        differing = _compare_output_frames(
+            frame_a, frame_b_with_shared_difference, "a", "b", "m", "m"
+        )
+
+        self.assertEqual(forward.metric, "normalized-rmse-shared-timeline-v2")
+        self.assertEqual(forward.overall_distance, 0.0)
+        self.assertEqual(reverse.overall_distance, 0.0)
+        self.assertEqual(forward.section_comparisons[0].missing_fraction, 0.0)
+        self.assertEqual(forward.timeline_coverage.timestamp_count_a, 3)
+        self.assertEqual(forward.timeline_coverage.timestamp_count_b, 6)
+        self.assertEqual(forward.timeline_coverage.shared_timestamp_count, 3)
+        self.assertEqual(forward.timeline_coverage.trailing_timestamp_count_a, 0)
+        self.assertEqual(forward.timeline_coverage.trailing_timestamp_count_b, 3)
+        self.assertEqual(reverse.timeline_coverage.trailing_timestamp_count_a, 3)
+        self.assertEqual(reverse.timeline_coverage.trailing_timestamp_count_b, 0)
+        self.assertGreater(differing.overall_distance, 0.0)
+
+    def test_internal_gap_is_penalized_while_trailing_periods_are_coverage(
+        self,
+    ) -> None:
+        columns = MultiIndex.from_tuples(
+            [("node", "J1", "depth")],
+            names=["element_type", "element_name", "attribute"],
+        )
+        frame_a = DataFrame(
+            [1.0, 3.0, 4.0],
+            index=DatetimeIndex(
+                [
+                    Timestamp("2020-01-01 00:00"),
+                    Timestamp("2020-01-01 00:10"),
+                    Timestamp("2020-01-01 00:15"),
+                ]
+            ),
+            columns=columns,
+        )
+        frame_b = DataFrame(
+            [1.0, 2.0, 3.0, 4.0, 5.0],
+            index=date_range("2020-01-01", periods=5, freq="5min"),
+            columns=columns,
+        )
+
+        forward = _compare_output_frames(frame_a, frame_b, "a", "b", "m", "m")
+        reverse = _compare_output_frames(frame_b, frame_a, "b", "a", "m", "m")
+
+        self.assertEqual(forward.overall_distance, 0.25)
+        self.assertEqual(reverse.overall_distance, 0.25)
+        section = forward.section_comparisons[0]
+        self.assertEqual(section.missing_count, 1)
+        self.assertEqual(section.timestamp_count, 4)
+        self.assertEqual(forward.timeline_coverage.trailing_timestamp_count_b, 1)
+        self.assertEqual(reverse.timeline_coverage.trailing_timestamp_count_a, 1)
 
     def test_output_distance_uses_symmetric_rms_normalized_rmse(self) -> None:
         columns = MultiIndex.from_tuples(
@@ -166,10 +246,9 @@ class OutputExtractionTests(unittest.TestCase):
         self.assertAlmostEqual(forward.overall_distance, expected)
         self.assertAlmostEqual(reverse.overall_distance, expected)
         self.assertAlmostEqual(scaled.overall_distance, expected)
-        self.assertAlmostEqual(
-            forward.section_comparisons[0].numeric_distance,
-            expected,
-        )
+        numeric_distance = forward.section_comparisons[0].numeric_distance
+        self.assertIsNotNone(numeric_distance)
+        self.assertAlmostEqual(cast(float, numeric_distance), expected)
 
     def test_event_scale_prevents_near_zero_noise_from_dominating(self) -> None:
         columns = MultiIndex.from_tuples(
@@ -223,7 +302,8 @@ class OutputExtractionTests(unittest.TestCase):
         section = comparison.section_comparisons[0]
 
         self.assertEqual(section.numeric_distance, 0.0)
-        self.assertAlmostEqual(section.missing_fraction, 1.0 / 3.0)
+        self.assertIsNotNone(section.missing_fraction)
+        self.assertAlmostEqual(cast(float, section.missing_fraction), 1.0 / 3.0)
         self.assertAlmostEqual(section.distance, 1.0 / 3.0)
         self.assertEqual(section.finite_pair_count, 1)
         self.assertEqual(section.missing_count, 1)

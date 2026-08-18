@@ -3,10 +3,11 @@ from __future__ import annotations
 import dataclasses
 import math
 import numbers
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 
-OUTPUT_DISTANCE_METRIC_NRMSE = "normalized-rmse-missing-v1"
+OUTPUT_DISTANCE_METRIC_NRMSE = "normalized-rmse-shared-timeline-v2"
+OUTPUT_DISTANCE_METRIC_NRMSE_V1 = "normalized-rmse-missing-v1"
 OUTPUT_DISTANCE_METRIC_LEGACY = "legacy-cell-distance-v1"
 
 
@@ -26,11 +27,27 @@ def _graph_count(data: dict[str, Any], name: str, minimum: int = 0) -> int:
     return value
 
 
+def _timeline_count(
+    data: dict[str, Any], name: str, default: int | None
+) -> int | None:
+    value = data.get(name, default)
+    if value is None and default is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"Timeline coverage field {name!r} must be a nonnegative integer")
+    return value
+
+
 def _graph_number(data: dict[str, Any], name: str) -> float:
     value = data.get(name)
     if isinstance(value, bool) or not isinstance(value, numbers.Real):
         raise ValueError(f"Graphical comparison field {name!r} must be numeric")
-    numeric = float(value)
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(
+            f"Graphical comparison field {name!r} must be numeric"
+        ) from exc
     if not math.isfinite(numeric):
         raise ValueError(f"Graphical comparison field {name!r} must be finite")
     return numeric
@@ -49,7 +66,12 @@ def _graph_values(data: dict[str, Any], name: str) -> list[float | None]:
                 f"Graphical comparison field {name!r} must contain finite numbers or null"
             )
         else:
-            numeric = float(value)
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise ValueError(
+                    f"Graphical comparison field {name!r} must contain finite numbers or null"
+                ) from exc
             if not math.isfinite(numeric):
                 raise ValueError(
                     f"Graphical comparison field {name!r} must contain finite numbers or null"
@@ -142,14 +164,17 @@ class OutputSectionComparison(SectionComparison):
         )
 
 
+ComparisonSection = TypeVar("ComparisonSection", bound=SectionComparison)
+
+
 @dataclasses.dataclass
-class ModelComparison:
+class ModelComparison(Generic[ComparisonSection]):
     inp_path: str
     inp_name: str
     engine_a: str
     engine_b: str
     overall_distance: float
-    section_comparisons: list[SectionComparison]
+    section_comparisons: list[ComparisonSection]
     report_warnings: list[str] = dataclasses.field(default_factory=list)
     report_errors: list[str] = dataclasses.field(default_factory=list)
     report_warnings_a: list[str] = dataclasses.field(default_factory=list)
@@ -161,8 +186,10 @@ class ModelComparison:
         return dataclasses.asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ModelComparison":
-        return cls(
+    def from_dict(
+        cls, data: dict[str, Any]
+    ) -> "ModelComparison[Any]":
+        return ModelComparison[SectionComparison](
             inp_path=data["inp_path"],
             inp_name=data["inp_name"],
             engine_a=data["engine_a"],
@@ -241,13 +268,43 @@ class OutputSeriesComparison:
 
 
 @dataclasses.dataclass
-class OutputComparison(ModelComparison):
+class OutputTimelineCoverage:
+    timestamp_count_a: int | None = None
+    timestamp_count_b: int | None = None
+    shared_timestamp_count: int | None = None
+    trailing_timestamp_count_a: int = 0
+    trailing_timestamp_count_b: int = 0
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "OutputTimelineCoverage":
+        return cls(
+            timestamp_count_a=_timeline_count(data, "timestamp_count_a", None),
+            timestamp_count_b=_timeline_count(data, "timestamp_count_b", None),
+            shared_timestamp_count=_timeline_count(
+                data, "shared_timestamp_count", None
+            ),
+            trailing_timestamp_count_a=_timeline_count(
+                data, "trailing_timestamp_count_a", 0
+            )
+            or 0,
+            trailing_timestamp_count_b=_timeline_count(
+                data, "trailing_timestamp_count_b", 0
+            )
+            or 0,
+        )
+
+
+@dataclasses.dataclass
+class OutputComparison(ModelComparison[OutputSectionComparison]):
     graphical_series: list[OutputSeriesComparison] = dataclasses.field(
         default_factory=list
     )
     graphical_unavailable_reason: str | None = None
     details_retained: bool = True
     metric: str = OUTPUT_DISTANCE_METRIC_NRMSE
+    timeline_coverage: OutputTimelineCoverage = dataclasses.field(
+        default_factory=OutputTimelineCoverage
+    )
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "OutputComparison":
@@ -290,6 +347,11 @@ class OutputComparison(ModelComparison):
                 data["metric"]
                 if isinstance(data.get("metric"), str)
                 else OUTPUT_DISTANCE_METRIC_LEGACY
+            ),
+            timeline_coverage=(
+                OutputTimelineCoverage.from_dict(data["timeline_coverage"])
+                if isinstance(data.get("timeline_coverage"), dict)
+                else OutputTimelineCoverage()
             ),
         )
 

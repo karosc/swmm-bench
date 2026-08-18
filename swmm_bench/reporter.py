@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 import itertools
+from math import inf
 from pathlib import Path
 from statistics import mean
 from typing import Any
 
-from jinja2 import Environment, PackageLoader
+from jinja2 import Environment, PackageLoader  # pyright: ignore[reportMissingImports]
 from rich.console import Console
 from rich.table import Table
 
@@ -16,6 +17,7 @@ from swmm_bench.models import (
     ModelComparison,
     OUTPUT_DISTANCE_METRIC_LEGACY,
     OUTPUT_DISTANCE_METRIC_NRMSE,
+    OUTPUT_DISTANCE_METRIC_NRMSE_V1,
     OutputComparison,
 )
 
@@ -41,6 +43,13 @@ def _output_metric_info(metric: str) -> dict[str, str]:
             "label": "Symmetric NRMSE + missing penalty",
             "short_label": "NRMSE + missing",
         }
+    if metric == OUTPUT_DISTANCE_METRIC_NRMSE_V1:
+        return {
+            "id": metric,
+            "kind": "nrmse-v1",
+            "label": "Symmetric NRMSE + all-timestamp missing penalty",
+            "short_label": "NRMSE + all missing",
+        }
     if metric == OUTPUT_DISTANCE_METRIC_LEGACY:
         return {
             "id": metric,
@@ -54,6 +63,30 @@ def _output_metric_info(metric: str) -> dict[str, str]:
         "label": f"Unknown output metric ({metric})",
         "short_label": "Unknown metric",
     }
+
+
+def _output_timeline_summary(comparison: OutputComparison) -> str | None:
+    coverage = comparison.timeline_coverage
+    shared = coverage.shared_timestamp_count
+    if shared is None:
+        return None
+
+    trailing = []
+    for engine, count in (
+        (comparison.engine_a, coverage.trailing_timestamp_count_a),
+        (comparison.engine_b, coverage.trailing_timestamp_count_b),
+    ):
+        if count:
+            suffix = "timestamp" if count == 1 else "timestamps"
+            trailing.append(f"{engine} has {count} additional trailing {suffix}")
+    if not trailing:
+        return None
+
+    shared_suffix = "timestamp" if shared == 1 else "timestamps"
+    return (
+        f"{shared} shared {shared_suffix}; {'; '.join(trailing)}. "
+        "Trailing-only timestamps do not affect value distance."
+    )
 
 
 def _uses_report_analysis_duration(result: BenchmarkResult) -> bool:
@@ -110,7 +143,9 @@ def print_summary(result: BenchmarkResult) -> None:
         if not completed:
             speed_table.add_row(model_name, "-", "-")
             continue
-        fastest = min(completed, key=lambda row: row.duration_s or float("inf"))
+        fastest = min(
+            completed, key=lambda row: row.duration_s if row.duration_s is not None else inf
+        )
         slowest = max(completed, key=lambda row: row.duration_s or 0.0)
         speed_table.add_row(
             model_name,
@@ -501,6 +536,7 @@ def _build_template_context(result: BenchmarkResult) -> dict[str, Any]:
                 "placeholder_reason": item["placeholder_reason"],
                 "severity": item["severity"],
                 "metric_info": _output_metric_info(comparison.metric),
+                "timeline_summary": _output_timeline_summary(comparison),
                 "details_retained": getattr(comparison, "details_retained", True),
                 "graphical_series": graphical_series,
                 "graphical_note": graphical_note,

@@ -160,7 +160,7 @@ scale = max(RMS(A), RMS(B))
 numeric distance = min(RMSE / scale, 1)
 ```
 
-Missing timestamps, one-sided null or invalid values, and series emitted by only one engine count as missing. Paired nulls are neutral:
+One-sided timestamps within the common output horizon, one-sided null or invalid values, and series emitted by only one engine count as missing. Paired nulls are neutral. Timestamps after the earlier output's final timestamp are recorded as trailing timeline coverage and do not affect value distance:
 
 ```text
 series distance = missing fraction + (1 - missing fraction) * numeric distance

@@ -9,6 +9,7 @@ from swmm_bench.models import (
     OutputComparison,
     OutputSectionComparison,
     OutputSeriesComparison,
+    OutputTimelineCoverage,
 )
 
 
@@ -195,6 +196,12 @@ class ModelCompatibilityTests(unittest.TestCase):
                             timestamp_count=3,
                         )
                     ],
+                    timeline_coverage=OutputTimelineCoverage(
+                        timestamp_count_a=3,
+                        timestamp_count_b=5,
+                        shared_timestamp_count=3,
+                        trailing_timestamp_count_b=2,
+                    ),
                     graphical_series=[
                         OutputSeriesComparison(
                             element_type="node",
@@ -218,6 +225,12 @@ class ModelCompatibilityTests(unittest.TestCase):
 
         comparison = loaded.output_comparisons[0]
         self.assertEqual(comparison.metric, OUTPUT_DISTANCE_METRIC_NRMSE)
+        self.assertEqual(comparison.timeline_coverage.timestamp_count_a, 3)
+        self.assertEqual(comparison.timeline_coverage.timestamp_count_b, 5)
+        self.assertEqual(comparison.timeline_coverage.shared_timestamp_count, 3)
+        self.assertEqual(
+            comparison.timeline_coverage.trailing_timestamp_count_b, 2
+        )
         section = comparison.section_comparisons[0]
         self.assertEqual(section.numeric_distance, 0.4)
         self.assertEqual(section.missing_count, 1)
@@ -227,6 +240,17 @@ class ModelCompatibilityTests(unittest.TestCase):
         self.assertEqual(series.values_a, [1.0, None])
         self.assertEqual(series.source_point_count, 3)
         self.assertTrue(series.sampled)
+
+    def test_timeline_coverage_rejects_invalid_counts(self) -> None:
+        for field, value in (
+            ("timestamp_count_a", -1),
+            ("shared_timestamp_count", True),
+            ("trailing_timestamp_count_b", None),
+            ("trailing_timestamp_count_a", "3"),
+        ):
+            with self.subTest(field=field, value=value):
+                with self.assertRaisesRegex(ValueError, field):
+                    OutputTimelineCoverage.from_dict({field: value})
 
     def test_unknown_output_metric_identifier_is_preserved(self) -> None:
         comparison = OutputComparison.from_dict(

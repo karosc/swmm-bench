@@ -13,6 +13,7 @@ from swmm_bench.models import (
     OutputComparison,
     OutputSectionComparison,
     OutputSeriesComparison,
+    OutputTimelineCoverage,
     SectionComparison,
 )
 from swmm_bench.reporter import render_html, save_json
@@ -39,6 +40,44 @@ class ReporterTests(unittest.TestCase):
                     html = output.read_text(encoding="utf-8")
 
                 self.assertIn(expected, html)
+
+    def test_output_comparison_reports_trailing_timeline_coverage(self) -> None:
+        result = BenchmarkResult(
+            schema_version="5",
+            name="timeline-coverage",
+            timestamp="2026-08-18T00:00:00+00:00",
+            platform={},
+            engine_results=[],
+            comparisons=[],
+            output_comparisons=[
+                OutputComparison(
+                    inp_path="model.inp",
+                    inp_name="model.inp",
+                    engine_a="epaswmm",
+                    engine_b="runswmmrs",
+                    overall_distance=0.0,
+                    section_comparisons=[],
+                    timeline_coverage=OutputTimelineCoverage(
+                        timestamp_count_a=3,
+                        timestamp_count_b=6,
+                        shared_timestamp_count=3,
+                        trailing_timestamp_count_b=3,
+                    ),
+                )
+            ],
+        )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output = Path(temporary_directory) / "report.html"
+            render_html(result, output)
+            html = output.read_text(encoding="utf-8")
+
+        self.assertIn('data-severity="green"', html)
+        self.assertIn("timeline coverage differs · matching", html)
+        self.assertNotIn("timeline coverage differs · not comparable", html)
+        self.assertIn("3 shared timestamps", html)
+        self.assertIn("runswmmrs has 3 additional trailing timestamps", html)
+        self.assertIn("do not affect value distance", html)
 
     def test_comparison_drilldown_labels_report_tables(self) -> None:
         result = BenchmarkResult(

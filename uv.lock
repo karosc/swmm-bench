@@ -452,22 +452,22 @@ dependencies = [
 requires-dist = [
     { name = "jinja2", specifier = ">=3.1" },
     { name = "psutil", specifier = ">=5.9" },
-    { name = "swmm-pandas", specifier = ">=0.14.1" },
+    { name = "swmm-pandas", specifier = "==0.14.2" },
     { name = "typer", extras = ["all"], specifier = ">=0.9" },
 ]
 
 [[package]]
 name = "swmm-pandas"
-version = "0.14.1"
+version = "0.14.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "julian" },
     { name = "pandas" },
     { name = "swmm-toolkit" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/47/05/e0fd70d3c38686bb7fd82d6ef46650be01a958d0ec4bcca96736115fd4a3/swmm_pandas-0.14.1.tar.gz", hash = "sha256:189ccd4e3a9867c0ea1c3aeeb8ff83467dbf440a41e8fea1e2fddb9c68eb167e", size = 202982, upload-time = "2026-07-29T17:24:56.234Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b5/27/6b7b656da6f9027f427c98710ff6832f09ff6c9153f476899d4055448d93/swmm_pandas-0.14.2.tar.gz", hash = "sha256:7f898e066024f4df19bdd9f515b15d62da929303841313d4de40ceca0e644108", size = 202937, upload-time = "2026-08-18T15:27:06.471Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/48/34/97029527d8cb763d951bc31db3988594d308a7d22f807e207d69e4410f55/swmm_pandas-0.14.1-py3-none-any.whl", hash = "sha256:0874b1bff2090d683a7702efcac27340b21b8023138dd18dc5b1c9f0b813dcb3", size = 207497, upload-time = "2026-07-29T17:24:54.818Z" },
+    { url = "https://files.pythonhosted.org/packages/d3/15/935b6553766e5a03c9b6ab594c58e3d336f9fa40859d6e74ce4fb2305495/swmm_pandas-0.14.2-py3-none-any.whl", hash = "sha256:b32b22da8407dcf072d504f084128a49b71e7b8b3857d386985f15f4f79f88a2", size = 207530, upload-time = "2026-08-18T15:27:05.017Z" },
 ]
 
 [[package]]

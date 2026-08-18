@@ -7,12 +7,12 @@ import itertools
 import math
 import numbers
 import warnings
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, Literal, get_type_hints
 
-from pandas import DataFrame, Timedelta, isna
+from pandas import DataFrame, Timedelta, isna  # pyright: ignore[reportMissingImports]
 
 from swmm_bench.models import (
     EngineResult,
@@ -20,10 +20,11 @@ from swmm_bench.models import (
     OutputComparison,
     OutputSectionComparison,
     OutputSeriesComparison,
+    OutputTimelineCoverage,
     SectionComparison,
 )
 from swmm_bench.output import extract_output_frame, output_series_name
-from swmm.pandas import Report
+from swmm.pandas import Report  # pyright: ignore[reportMissingImports]
 
 _MAX_RETAINED_DIFFERENCES = 100
 _MAX_GRAPH_POINTS_PER_SERIES = 120
@@ -52,6 +53,12 @@ class _PreparedOutputSeries:
     values_b: list[Any]
     numeric_a: list[float | None]
     numeric_b: list[float | None]
+
+
+@dataclasses.dataclass(frozen=True)
+class _OutputTimeline:
+    comparison_index: Any
+    coverage: OutputTimelineCoverage
 
 
 ProgressCallback = Callable[[ComparisonProgress], None]
@@ -411,10 +418,47 @@ def _output_diagnostic_value(value: Any) -> Any:
     return numeric if numeric is not None else str(value)
 
 
+def _output_column(raw_column: Any) -> tuple[str, str, str]:
+    values = tuple(str(item) for item in raw_column)
+    if len(values) != 3:
+        raise ValueError(f"Expected three output column levels, received {len(values)}")
+    return values[0], values[1], values[2]
+
+
 def _output_union_index(frame_a: DataFrame, frame_b: DataFrame) -> Any:
     if len(frame_a.index):
         return frame_a.index.union(frame_b.index).sort_values()
     return frame_b.index
+
+
+def _output_timeline(frame_a: DataFrame, frame_b: DataFrame) -> _OutputTimeline:
+    index_a = frame_a.index
+    index_b = frame_b.index
+    shared_timestamp_count = len(index_a.intersection(index_b))
+    comparison_index = _output_union_index(frame_a, frame_b)
+    trailing_timestamp_count_a = 0
+    trailing_timestamp_count_b = 0
+
+    if len(index_a) and len(index_b):
+        common_end = min(max(index_a), max(index_b))
+        trailing_timestamp_count_a = sum(
+            timestamp > common_end for timestamp in index_a
+        )
+        trailing_timestamp_count_b = sum(
+            timestamp > common_end for timestamp in index_b
+        )
+        comparison_index = comparison_index[comparison_index <= common_end]
+
+    return _OutputTimeline(
+        comparison_index=comparison_index,
+        coverage=OutputTimelineCoverage(
+            timestamp_count_a=len(index_a),
+            timestamp_count_b=len(index_b),
+            shared_timestamp_count=shared_timestamp_count,
+            trailing_timestamp_count_a=trailing_timestamp_count_a,
+            trailing_timestamp_count_b=trailing_timestamp_count_b,
+        ),
+    )
 
 
 def _output_union_columns(frame_a: DataFrame, frame_b: DataFrame) -> Any:
@@ -478,7 +522,7 @@ def _compare_output_series(
     prepared: _PreparedOutputSeries,
     include_details: bool = True,
 ) -> OutputSectionComparison:
-    column = tuple(str(item) for item in raw_column)
+    column = _output_column(raw_column)
     series_name = output_series_name(column)
     column_in_a = raw_column in frame_a.columns
     column_in_b = raw_column in frame_b.columns
@@ -776,7 +820,7 @@ def _build_graphical_series(
     sorted_columns: list[Any],
     aligned_a: DataFrame,
     aligned_b: DataFrame,
-    section_comparisons: list[SectionComparison],
+    section_comparisons: Sequence[OutputSectionComparison],
     *,
     inp_name: str,
     engine_a: str,
@@ -806,7 +850,7 @@ def _build_graphical_series(
     graphical_series: list[OutputSeriesComparison] = []
 
     for position, raw_column in enumerate(sorted_columns, start=1):
-        column = tuple(str(item) for item in raw_column)
+        column = _output_column(raw_column)
         series_name = output_series_name(column)
         section = sections_by_name[series_name]
         values_a = aligned_a.loc[:, raw_column].tolist()
@@ -867,7 +911,8 @@ def _compare_output_frames(
     union_columns = _output_union_columns(frame_a, frame_b)
     if not len(union_columns):
         raise ValueError("Neither output file contains reporting periods")
-    union_index = _output_union_index(frame_a, frame_b)
+    timeline = _output_timeline(frame_a, frame_b)
+    union_index = timeline.comparison_index
     sorted_columns = sorted(union_columns)
     aligned_a = None
     aligned_b = None
@@ -917,9 +962,7 @@ def _compare_output_frames(
                     inp_name=inp_name,
                     engine_a=engine_a,
                     engine_b=engine_b,
-                    item_name=output_series_name(
-                        tuple(str(item) for item in raw_column)
-                    ),
+                    item_name=output_series_name(_output_column(raw_column)),
                 )
             )
 
@@ -971,6 +1014,7 @@ def _compare_output_frames(
         graphical_series=graphical_series,
         details_retained=bool(graphical_series),
         graphical_unavailable_reason=unavailable_reason,
+        timeline_coverage=timeline.coverage,
     )
 
 

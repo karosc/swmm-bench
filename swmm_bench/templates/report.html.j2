@@ -1140,7 +1140,7 @@
             <button class="explorer-item" type="button" data-explorer-item data-panel-id="{{ item.dom_id }}" data-search="{{ comparison.inp_name }} {{ comparison.engine_a }} {{ comparison.engine_b }} {{ item.metric_info.short_label }}" data-severity="{{ klass }}" data-engine-pair="{{ comparison.engine_a }} vs {{ comparison.engine_b }}" data-distance="{{ comparison.overall_distance }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">
               <span class="series-item-top"><span class="series-type">{{ severity_label(klass) }}</span><span class="pill distance-{{ klass }}">{{ '%.6f'|format(comparison.overall_distance) }}</span></span>
               <span class="explorer-item-title">{{ comparison.inp_name }}</span>
-              <span class="explorer-item-meta">{{ comparison.engine_a }} vs {{ comparison.engine_b }} · {{ item.metric_info.short_label }}{% if item.placeholder_reason %} · not comparable{% elif item.graphical_series %} · {{ item.graphical_series|length }} plotted series{% else %} · no plotted series{% endif %}</span>
+              <span class="explorer-item-meta">{{ comparison.engine_a }} vs {{ comparison.engine_b }} · {{ item.metric_info.short_label }}{% if item.timeline_summary %} · timeline coverage differs{% endif %}{% if item.placeholder_reason %} · {{ "not comparable" if klass == "failed" else "matching" }}{% elif item.graphical_series %} · {{ item.graphical_series|length }} plotted series{% else %} · no plotted series{% endif %}</span>
             </button>
           </li>
           {% endfor %}
@@ -1153,7 +1153,8 @@
         <section class="explorer-panel" data-explorer-panel="{{ item.dom_id }}" {% if not loop.first %}hidden{% endif %}>
           <div class="output-comparison" data-output-comparison data-engine-a="{{ comparison.engine_a }}" data-engine-b="{{ comparison.engine_b }}">
             <h3>{{ comparison.inp_name }}</h3>
-            <p class="muted">{{ comparison.engine_a }} vs {{ comparison.engine_b }} · {{ item.metric_info.short_label }} · overall distance <span class="pill distance-{{ klass }}">{{ '%.6f'|format(comparison.overall_distance) }}</span>{% if item.placeholder_reason %} <span class="pill distance-{{ klass }}">{{ "failed" if klass == "failed" else "not comparable" }}</span>{% elif not item.details_retained %} <span class="pill distance-{{ klass }}">summary only</span>{% elif item.graphical_series %} · {{ item.graphical_series|length }} plotted series{% endif %}</p>
+            <p class="muted">{{ comparison.engine_a }} vs {{ comparison.engine_b }} · {{ item.metric_info.short_label }} · overall distance <span class="pill distance-{{ klass }}">{{ '%.6f'|format(comparison.overall_distance) }}</span>{% if item.placeholder_reason %} <span class="pill distance-{{ klass }}">{{ "failed" if klass == "failed" else "match" }}</span>{% elif not item.details_retained %} <span class="pill distance-{{ klass }}">summary only</span>{% elif item.graphical_series %} · {{ item.graphical_series|length }} plotted series{% endif %}</p>
+            {% if item.timeline_summary %}<p class="muted">{{ item.timeline_summary }}</p>{% endif %}
             {% if item.placeholder_reason or not item.details_retained %}
             <div class="graph-empty{% if item.placeholder_reason and klass == 'failed' %} distance-failed{% endif %}">
               {% if item.placeholder_reason %}
@@ -1177,10 +1178,13 @@
                 {% if item.metric_info.kind == "nrmse" %}
                   <p>Finite paired timestamps use a symmetric RMS-normalized root mean square error.</p>
                   <code class="metric-formula">numeric distance = min(RMSE(A − B) / max(RMS(A), RMS(B)), 1)</code>
-                  <p>One-sided timestamps, one-sided null or invalid values, and semantic series absent from one engine count as missing. Paired null values are neutral.</p>
+                  <p>One-sided timestamps within the shared timeline, one-sided null or invalid values, and semantic series absent from one engine count as missing. Paired null values are neutral. Trailing-only timestamps are reported as timeline coverage and do not affect value distance.</p>
                   <code class="metric-formula">series distance = missing fraction + (1 − missing fraction) × numeric distance</code>
                   <p>The overall output distance is the equal-weight arithmetic mean of all semantic-series distances. Scores at or below 1% are green, scores at or below 10% are yellow, and larger scores are red.</p>
                   <p>Report-table comparisons use a separate cell-weighted relative-distance metric.</p>
+                {% elif item.metric_info.kind == "nrmse-v1" %}
+                  <p>This saved result uses the prior NRMSE metric, where every one-sided timestamp—including trailing-only timestamps—contributes to the missing-value penalty.</p>
+                  <code class="metric-formula">series distance = missing fraction + (1 − missing fraction) × numeric distance</code>
                 {% elif item.metric_info.kind == "legacy" %}
                   <p>This saved result uses the legacy output metric: the mean of pointwise absolute differences normalized by the larger magnitude at each timestamp and capped at one.</p>
                   <code class="metric-formula">point distance = min(|A − B| / max(|A|, |B|), 1)</code>
