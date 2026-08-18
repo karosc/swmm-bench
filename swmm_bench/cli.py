@@ -68,7 +68,13 @@ def _validate_engines(engines: list[str]) -> list[str]:
             )
         if not engine_path.is_file():
             raise typer.BadParameter(f"Engine path is not a file: {engine_path}")
-        if not os.access(engine_path, os.X_OK):
+        try:
+            is_executable = os.access(engine_path, os.X_OK)
+        except OSError as exc:
+            raise typer.BadParameter(
+                f"Could not inspect engine executable: {engine_path}"
+            ) from exc
+        if not is_executable:
             raise typer.BadParameter(f"Engine path is not executable: {engine_path}")
         validated.append(str(engine_path))
     return validated
@@ -91,6 +97,8 @@ def _execute_benchmark(
     timeout: float,
     html: bool,
     threads: int,
+    parse_workers: int,
+    output_parse_workers: int,
     variable_step: float | None,
     json_out: Path | None,
     inp_names: dict[Path, str] | None = None,
@@ -197,6 +205,7 @@ def _execute_benchmark(
         comparisons = compare_all(
             engine_results,
             progress_callback=comparison_progress,
+            parse_workers=parse_workers,
         )
         if pair_total == 0:
             progress.update(
@@ -208,6 +217,7 @@ def _execute_benchmark(
         output_comparisons = compare_all_outputs(
             engine_results,
             progress_callback=comparison_progress,
+            parse_workers=output_parse_workers,
         )
         if pair_total == 0:
             progress.update(
@@ -282,6 +292,18 @@ def run(
     threads: int = typer.Option(
         1, "--threads", help="Number of threads to use per run."
     ),
+    parse_workers: int = typer.Option(
+        4,
+        "--parse-workers",
+        min=1,
+        help="Processes used to parse report files.",
+    ),
+    output_parse_workers: int = typer.Option(
+        1,
+        "--output-parse-workers",
+        min=1,
+        help="Processes used to parse binary outputs; higher values use more memory.",
+    ),
     variable_step: float | None = typer.Option(
         None,
         "--variable-step",
@@ -319,6 +341,8 @@ def run(
             output_dir=output_dir,
             timeout=timeout,
             threads=threads,
+            parse_workers=parse_workers,
+            output_parse_workers=output_parse_workers,
             variable_step=variable_step,
             html=html,
             json_out=json_out,
@@ -336,6 +360,8 @@ def run(
             output_dir=output_dir,
             timeout=timeout,
             threads=threads,
+            parse_workers=parse_workers,
+            output_parse_workers=output_parse_workers,
             variable_step=variable_step,
             html=html,
             json_out=json_out,
@@ -409,6 +435,18 @@ def rebuild(
         "--all-comparisons",
         help="Retain output chart data at every distance; requires --outputs.",
     ),
+    parse_workers: int = typer.Option(
+        4,
+        "--parse-workers",
+        min=1,
+        help="Processes used to parse report files.",
+    ),
+    output_parse_workers: int = typer.Option(
+        1,
+        "--output-parse-workers",
+        min=1,
+        help="Processes used to parse binary outputs; higher values use more memory.",
+    ),
 ) -> None:
     run_directory = run_directory.expanduser().resolve()
     if all_comparisons and not outputs:
@@ -475,7 +513,11 @@ def rebuild(
                     visible=True,
                 )
 
-        comparisons = compare_all(engine_results, progress_callback=comparison_progress)
+        comparisons = compare_all(
+            engine_results,
+            progress_callback=comparison_progress,
+            parse_workers=parse_workers,
+        )
         if pair_total == 0:
             progress.update(
                 report_task,
@@ -489,6 +531,7 @@ def rebuild(
                 engine_results,
                 progress_callback=comparison_progress,
                 include_all_comparisons=all_comparisons,
+                parse_workers=output_parse_workers,
             )
             if pair_total == 0:
                 progress.update(
@@ -561,6 +604,18 @@ def run_suite(
     threads: int = typer.Option(
         1, "--threads", help="Number of threads to use per run."
     ),
+    parse_workers: int = typer.Option(
+        4,
+        "--parse-workers",
+        min=1,
+        help="Processes used to parse report files.",
+    ),
+    output_parse_workers: int = typer.Option(
+        1,
+        "--output-parse-workers",
+        min=1,
+        help="Processes used to parse binary outputs; higher values use more memory.",
+    ),
     variable_step: float | None = typer.Option(
         None,
         "--variable-step",
@@ -602,6 +657,8 @@ def run_suite(
             output_dir=output_dir,
             timeout=timeout,
             threads=threads,
+            parse_workers=parse_workers,
+            output_parse_workers=output_parse_workers,
             variable_step=variable_step,
             html=html,
             json_out=json_out,
@@ -634,6 +691,18 @@ def run_interfaces(
         1,
         "--threads",
         help="Number of threads to use per engine run.",
+    ),
+    parse_workers: int = typer.Option(
+        4,
+        "--parse-workers",
+        min=1,
+        help="Processes used to parse report files.",
+    ),
+    output_parse_workers: int = typer.Option(
+        1,
+        "--output-parse-workers",
+        min=1,
+        help="Processes used to parse binary outputs; higher values use more memory.",
     ),
     variable_step: float | None = typer.Option(
         None,
@@ -684,6 +753,8 @@ def run_interfaces(
             name=run_name,
             timeout=timeout,
             threads=threads,
+            parse_workers=parse_workers,
+            output_workers=output_parse_workers,
             variable_step=variable_step,
             platform=_platform_info(),
             progress_callback=lambda _result: progress.advance(task),

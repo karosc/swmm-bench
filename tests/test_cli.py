@@ -42,6 +42,10 @@ class RegressionCliTests(unittest.TestCase):
                     "complex/rtk.inp",
                     "--variable-step",
                     "0",
+                    "--parse-workers",
+                    "2",
+                    "--output-parse-workers",
+                    "3",
                 ],
             )
 
@@ -49,6 +53,10 @@ class RegressionCliTests(unittest.TestCase):
         self.assertEqual(
             execute_benchmark.call_args.kwargs["variable_step"],
             0.0,
+        )
+        self.assertEqual(execute_benchmark.call_args.kwargs["parse_workers"], 2)
+        self.assertEqual(
+            execute_benchmark.call_args.kwargs["output_parse_workers"], 3
         )
 
     def test_suite_run_records_stable_model_identity(self) -> None:
@@ -116,6 +124,10 @@ class BenchmarkCliTests(unittest.TestCase):
                         str(inp_path),
                         "--variable-step",
                         "0.25",
+                        "--parse-workers",
+                        "3",
+                        "--output-parse-workers",
+                        "2",
                     ],
                 )
 
@@ -123,6 +135,10 @@ class BenchmarkCliTests(unittest.TestCase):
             self.assertEqual(
                 execute_benchmark.call_args.kwargs["variable_step"],
                 0.25,
+            )
+            self.assertEqual(execute_benchmark.call_args.kwargs["parse_workers"], 3)
+            self.assertEqual(
+                execute_benchmark.call_args.kwargs["output_parse_workers"], 2
             )
 
     def test_run_uses_bundled_benchmarks_when_inp_is_omitted(self) -> None:

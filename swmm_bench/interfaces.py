@@ -119,7 +119,8 @@ def _copy_model_directory(inp_path: Path, destination: Path) -> Path:
 
 
 def _replace_use_with_save(text: str, case: InterfaceCase) -> str:
-    pattern = rf'(?im)^[ \t]*USE[ \t]+{case.use_kind}[ \t]+"[^"]+"[ \t]*$'
+    escaped_use_kind = re.escape(case.use_kind)
+    pattern = rf'(?im)^[ \t]*USE[ \t]+{escaped_use_kind}[ \t]+"[^"]+"[ \t]*$'
     replacement = f'SAVE {case.save_kind} "{case.artifact_name}"'
     updated, count = re.subn(pattern, replacement, text, count=1)
     if count != 1:
@@ -262,6 +263,8 @@ def run_interface_suite(
     name: str,
     timeout: float | None,
     threads: int,
+    parse_workers: int = 4,
+    output_workers: int = 1,
     platform: dict[str, Any],
     variable_step: float | None = None,
     progress_callback: Callable[[EngineResult], None] | None = None,
@@ -436,7 +439,11 @@ def run_interface_suite(
         timestamp=datetime.now(timezone.utc).isoformat(),
         platform=platform,
         engine_results=engine_results,
-        comparisons=compare_all(comparison_results),
-        output_comparisons=compare_all_outputs(comparison_results),
+        comparisons=compare_all(
+            comparison_results, parse_workers=parse_workers
+        ),
+        output_comparisons=compare_all_outputs(
+            comparison_results, parse_workers=output_workers
+        ),
         interface_families=family_results,
     )

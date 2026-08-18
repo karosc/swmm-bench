@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import math
+import shutil
+import tempfile
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import cast
 from unittest.mock import patch
@@ -548,6 +552,120 @@ class OutputExtractionTests(unittest.TestCase):
             )
 
         comparisons = compare_all_outputs([result("a"), result("b")])
+
+        self.assertEqual(len(comparisons), 1)
+        self.assertEqual(comparisons[0].overall_distance, 0.0)
+
+    def test_output_files_are_loaded_in_parallel(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            output_paths = [root / f"{name}.out" for name in ("a", "b")]
+            for output_path in output_paths:
+                output_path.write_bytes(b"output")
+
+            frame = DataFrame(
+                [[1.0]],
+                index=DatetimeIndex([Timestamp("2020-01-01")], name="datetime"),
+                columns=MultiIndex.from_tuples(
+                    [("node", "N1", "depth")],
+                    names=["element_type", "element_name", "attribute"],
+                ),
+            )
+            barrier = threading.Barrier(len(output_paths))
+            second_finished = threading.Event()
+            events = []
+
+            def extract(path: Path) -> DataFrame:
+                barrier.wait(timeout=2)
+                if path == output_paths[0]:
+                    self.assertTrue(second_finished.wait(timeout=2))
+                else:
+                    second_finished.set()
+                return frame.copy()
+
+            def result(engine_name: str, output_path: Path) -> EngineResult:
+                return EngineResult(
+                    engine_path=f"/{engine_name}",
+                    engine_name=engine_name,
+                    inp_path="model.inp",
+                    inp_name="model.inp",
+                    duration_s=1.0,
+                    peak_memory_mb=1.0,
+                    exit_code=0,
+                    rpt_path=None,
+                    stdout="",
+                    stderr="",
+                    error=None,
+                    out_path=str(output_path),
+                )
+
+            with (
+                patch(
+                    "swmm_bench.comparator.extract_output_frame", side_effect=extract
+                ) as extract_output,
+                patch(
+                    "swmm_bench.comparator._parse_executor",
+                    side_effect=lambda max_workers, **_kwargs: ThreadPoolExecutor(
+                        max_workers
+                    ),
+                ),
+            ):
+                comparisons = compare_all_outputs(
+                    [
+                        result(engine_name, output_path)
+                        for engine_name, output_path in zip(
+                            ("a", "b"), output_paths
+                        )
+                    ],
+                    progress_callback=events.append,
+                    retain_graphical=False,
+                    parse_workers=2,
+                )
+
+        self.assertEqual(extract_output.call_count, 2)
+        load_events = [event for event in events if event.phase == "output-load"]
+        self.assertEqual(
+            [event.item_name for event in load_events],
+            [str(output_paths[0]), str(output_paths[1])] * 2,
+        )
+        self.assertEqual(
+            [event.status for event in load_events],
+            ["started", "started", "completed", "completed"],
+        )
+        self.assertEqual(len(comparisons), 1)
+        self.assertEqual(comparisons[0].overall_distance, 0.0)
+
+    def test_output_process_pool_round_trip(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            output_paths = [root / f"{name}.out" for name in ("a", "b")]
+            for output_path in output_paths:
+                shutil.copy2(example_out_path, output_path)
+
+            def result(engine_name: str, output_path: Path) -> EngineResult:
+                return EngineResult(
+                    engine_path=f"/{engine_name}",
+                    engine_name=engine_name,
+                    inp_path="model.inp",
+                    inp_name="model.inp",
+                    duration_s=1.0,
+                    peak_memory_mb=1.0,
+                    exit_code=0,
+                    rpt_path=None,
+                    stdout="",
+                    stderr="",
+                    error=None,
+                    out_path=str(output_path),
+                )
+
+            comparisons = compare_all_outputs(
+                [
+                    result(engine_name, output_path)
+                    for engine_name, output_path in zip(("a", "b"), output_paths)
+                ],
+                retain_graphical=False,
+                parse_workers=2,
+            )
 
         self.assertEqual(len(comparisons), 1)
         self.assertEqual(comparisons[0].overall_distance, 0.0)

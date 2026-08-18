@@ -5,9 +5,11 @@ import dis
 import inspect
 import itertools
 import math
+import multiprocessing
 import numbers
 import warnings
 from collections.abc import Callable, Mapping, Sequence
+from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, Literal, get_type_hints
@@ -31,6 +33,17 @@ _MAX_GRAPH_POINTS_PER_SERIES = 120
 _MAX_GRAPH_POINTS_PER_COMPARISON = 12_000
 _GRAPHICAL_OUTPUT_DISTANCE_THRESHOLD = 0.01
 _MIN_GRAPH_POINTS_PER_SERIES = 3
+_DEFAULT_REPORT_PARSE_WORKERS = 4
+_DEFAULT_OUTPUT_PARSE_WORKERS = 1
+
+
+def _parse_executor(max_workers: int, *, use_processes: bool) -> Executor:
+    if use_processes:
+        return ProcessPoolExecutor(
+            max_workers=max_workers,
+            mp_context=multiprocessing.get_context("spawn"),
+        )
+    return ThreadPoolExecutor(max_workers=max_workers)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -102,8 +115,11 @@ def _cell_distance(value_a: Any, value_b: Any) -> tuple[float, float | None]:
         return 1.0, None
 
     if isinstance(value_a, numbers.Real) and isinstance(value_b, numbers.Real):
-        numeric_a = float(value_a)
-        numeric_b = float(value_b)
+        try:
+            numeric_a = float(value_a)
+            numeric_b = float(value_b)
+        except (TypeError, ValueError, OverflowError):
+            return 1.0, None
         if not math.isfinite(numeric_a) or not math.isfinite(numeric_b):
             return 1.0, None
         absolute = abs(numeric_a - numeric_b)
@@ -227,7 +243,7 @@ def _missing_table_comparison(
             differences=[],
             note=note,
         ),
-        float(cell_count),
+        cell_count * 1.0,
         cell_count,
     )
 
@@ -349,16 +365,30 @@ def _extract_report_tables(
     return tables, skipped, report_errors, report_warnings
 
 
-def compare_rpts(
-    rpt_a: str | Path,
-    rpt_b: str | Path,
+def _extract_report_tables_for_cache(
+    rpt_path: str | Path,
+) -> tuple[
+    tuple[dict[str, DataFrame], dict[str, str], list[str], list[str]],
+    list[str],
+]:
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        report = _extract_report_tables(rpt_path)
+    return report, [str(item.message) for item in caught]
+
+
+def _compare_report_tables(
+    report_a: tuple[dict[str, DataFrame], dict[str, str], list[str], list[str]],
+    report_b: tuple[dict[str, DataFrame], dict[str, str], list[str], list[str]],
     engine_a: str,
     engine_b: str,
     inp_path: str,
     inp_name: str,
 ) -> ModelComparison:
-    tables_a, skipped_a, errors_a, warnings_a = _extract_report_tables(rpt_a)
-    tables_b, skipped_b, errors_b, warnings_b = _extract_report_tables(rpt_b)
+    cached_tables_a, skipped_a, errors_a, warnings_a = report_a
+    cached_tables_b, skipped_b, errors_b, warnings_b = report_b
+    tables_a = cached_tables_a.copy()
+    tables_b = cached_tables_b.copy()
     skipped_comparisons: list[SectionComparison] = []
     for table_name in sorted(set(skipped_a) | set(skipped_b)):
         table_a = tables_a.pop(table_name, None)
@@ -400,6 +430,24 @@ def compare_rpts(
     )
 
 
+def compare_rpts(
+    rpt_a: str | Path,
+    rpt_b: str | Path,
+    engine_a: str,
+    engine_b: str,
+    inp_path: str,
+    inp_name: str,
+) -> ModelComparison:
+    return _compare_report_tables(
+        _extract_report_tables(rpt_a),
+        _extract_report_tables(rpt_b),
+        engine_a,
+        engine_b,
+        inp_path,
+        inp_name,
+    )
+
+
 def _chart_number(value: Any) -> float | None:
     if (
         _is_null(value)
@@ -407,7 +455,10 @@ def _chart_number(value: Any) -> float | None:
         or not isinstance(value, numbers.Real)
     ):
         return None
-    numeric = float(value)
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
     return numeric if math.isfinite(numeric) else None
 
 
@@ -1041,6 +1092,7 @@ def compare_all(
     engine_results: list[EngineResult],
     *,
     progress_callback: ProgressCallback | None = None,
+    parse_workers: int = _DEFAULT_REPORT_PARSE_WORKERS,
 ) -> list[ModelComparison]:
     comparisons: list[ModelComparison] = []
     grouped: dict[str, list[EngineResult]] = {}
@@ -1053,7 +1105,49 @@ def compare_all(
         for inp_path, results in grouped.items()
         for result_a, result_b in itertools.combinations(results, 2)
     ]
-    for position, (inp_path, result_a, result_b) in enumerate(pairs, start=1):
+
+    def report_path(result: EngineResult) -> Path | None:
+        if not result.rpt_path:
+            return None
+        path = Path(result.rpt_path)
+        if not path.exists() or path.stat().st_size == 0:
+            return None
+        return path
+
+    pair_paths = [
+        (report_path(result_a), report_path(result_b))
+        for _, result_a, result_b in pairs
+    ]
+    paths_to_load = list(
+        dict.fromkeys(
+            path
+            for paths in pair_paths
+            if all(path is not None for path in paths)
+            for path in paths
+            if path is not None
+        )
+    )
+    if parse_workers < 1:
+        raise ValueError("parse_workers must be at least 1")
+    reports_by_path = {}
+    if paths_to_load:
+        with _parse_executor(
+            min(parse_workers, len(paths_to_load)),
+            use_processes=parse_workers > 1 and len(paths_to_load) > 1,
+        ) as executor:
+            loaded_reports = executor.map(
+                _extract_report_tables_for_cache, paths_to_load
+            )
+            for path, (report, warning_messages) in zip(
+                paths_to_load, loaded_reports
+            ):
+                reports_by_path[path] = report
+                for message in warning_messages:
+                    warnings.warn(message, stacklevel=2)
+
+    for position, ((inp_path, result_a, result_b), (rpt_a, rpt_b)) in enumerate(
+        zip(pairs, pair_paths), start=1
+    ):
         status: Literal["completed", "skipped"] = "skipped"
         if progress_callback is not None:
             progress_callback(
@@ -1068,22 +1162,16 @@ def compare_all(
                 )
             )
         try:
-            if not result_a.rpt_path or not result_b.rpt_path:
-                continue
-            rpt_a = Path(result_a.rpt_path)
-            rpt_b = Path(result_b.rpt_path)
-            if not rpt_a.exists() or not rpt_b.exists():
-                continue
-            if rpt_a.stat().st_size == 0 or rpt_b.stat().st_size == 0:
+            if rpt_a is None or rpt_b is None:
                 continue
             comparisons.append(
-                compare_rpts(
-                    rpt_a=rpt_a,
-                    rpt_b=rpt_b,
-                    engine_a=result_a.engine_name,
-                    engine_b=result_b.engine_name,
-                    inp_path=inp_path,
-                    inp_name=result_a.inp_name,
+                _compare_report_tables(
+                    reports_by_path[rpt_a],
+                    reports_by_path[rpt_b],
+                    result_a.engine_name,
+                    result_b.engine_name,
+                    inp_path,
+                    result_a.inp_name,
                 )
             )
             status = "completed"
@@ -1110,6 +1198,7 @@ def compare_all_outputs(
     progress_callback: ProgressCallback | None = None,
     retain_graphical: bool = True,
     include_all_comparisons: bool = False,
+    parse_workers: int = _DEFAULT_OUTPUT_PARSE_WORKERS,
 ) -> list[OutputComparison]:
     comparisons: list[OutputComparison] = []
     grouped: dict[str, list[EngineResult]] = {}
@@ -1145,34 +1234,47 @@ def compare_all_outputs(
             if path is not None
         )
     )
-    for position, path in enumerate(paths_to_load, start=1):
-        status: Literal["completed", "skipped"] = "completed"
-        if progress_callback is not None:
-            progress_callback(
-                ComparisonProgress(
-                    phase="output-load",
-                    completed=position - 1,
-                    total=len(paths_to_load),
-                    item_name=str(path),
-                    status="started",
+    if parse_workers < 1:
+        raise ValueError("parse_workers must be at least 1")
+    completed_loads = 0
+    with _parse_executor(
+        min(parse_workers, len(paths_to_load) or 1),
+        use_processes=parse_workers > 1 and len(paths_to_load) > 1,
+    ) as executor:
+        futures_by_path = {}
+        for path in paths_to_load:
+            if progress_callback is not None:
+                progress_callback(
+                    ComparisonProgress(
+                        phase="output-load",
+                        completed=completed_loads,
+                        total=len(paths_to_load),
+                        item_name=str(path),
+                        status="started",
+                    )
                 )
-            )
-        try:
-            frames_by_path[path] = extract_output_frame(path)
-        except (OSError, TypeError, ValueError) as exc:
-            warnings.warn(f"Skipping unreadable output {path}: {exc}", stacklevel=2)
-            frames_by_path[path] = None
-            status = "skipped"
-        if progress_callback is not None:
-            progress_callback(
-                ComparisonProgress(
-                    phase="output-load",
-                    completed=position,
-                    total=len(paths_to_load),
-                    item_name=str(path),
-                    status=status,
+            futures_by_path[path] = executor.submit(extract_output_frame, path)
+
+        for path in paths_to_load:
+            future = futures_by_path[path]
+            status: Literal["completed", "skipped"] = "completed"
+            try:
+                frames_by_path[path] = future.result()
+            except (OSError, TypeError, ValueError) as exc:
+                warnings.warn(f"Skipping unreadable output {path}: {exc}", stacklevel=2)
+                frames_by_path[path] = None
+                status = "skipped"
+            completed_loads += 1
+            if progress_callback is not None:
+                progress_callback(
+                    ComparisonProgress(
+                        phase="output-load",
+                        completed=completed_loads,
+                        total=len(paths_to_load),
+                        item_name=str(path),
+                        status=status,
+                    )
                 )
-            )
 
     for position, ((inp_path, result_a, result_b), (out_a, out_b)) in enumerate(
         zip(pairs, pair_paths),

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import math
+import threading
 import unittest
 import tempfile
+import warnings
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-from pandas import DataFrame, Series, Timedelta
+from pandas import DataFrame, Series, Timedelta  # pyright: ignore[reportMissingImports]
 
 from swmm_bench.comparator import (
     _cell_distance,
@@ -389,6 +392,156 @@ class ReportExtractionTests(unittest.TestCase):
             "flow_routing_continuity",
             [item.section_name for item in forward.section_comparisons],
         )
+
+    def test_compare_all_parses_each_unique_report_once_in_parallel(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            report_paths = [root / f"{name}.rpt" for name in ("a", "b", "c")]
+            for report_path in report_paths:
+                report_path.write_text("report\n", encoding="utf-8")
+
+            barrier = threading.Barrier(len(report_paths))
+
+            def extract(_path: Path):
+                barrier.wait(timeout=2)
+                return {}, {}, [], []
+
+            def result(engine_name: str, report_path: Path) -> EngineResult:
+                return EngineResult(
+                    engine_path=f"/{engine_name}",
+                    engine_name=engine_name,
+                    inp_path="model.inp",
+                    inp_name="model.inp",
+                    duration_s=1.0,
+                    peak_memory_mb=1.0,
+                    exit_code=0,
+                    rpt_path=str(report_path),
+                    stdout="",
+                    stderr="",
+                    error=None,
+                )
+
+            with (
+                patch(
+                    "swmm_bench.comparator._extract_report_tables", side_effect=extract
+                ) as extract_report,
+                patch(
+                    "swmm_bench.comparator._parse_executor",
+                    side_effect=lambda max_workers, **_kwargs: ThreadPoolExecutor(
+                        max_workers
+                    ),
+                ),
+            ):
+                comparisons = compare_all(
+                    [
+                        result(engine_name, report_path)
+                        for engine_name, report_path in zip(
+                            ("a", "b", "c"), report_paths
+                        )
+                    ],
+                    parse_workers=3,
+                )
+
+        self.assertEqual(extract_report.call_count, 3)
+        self.assertEqual(
+            [(item.engine_a, item.engine_b) for item in comparisons],
+            [("a", "b"), ("a", "c"), ("b", "c")],
+        )
+
+    def test_compare_all_reemits_worker_warnings_in_path_order(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            report_paths = [root / f"{name}.rpt" for name in ("a", "b")]
+            for report_path in report_paths:
+                report_path.write_text("report\n", encoding="utf-8")
+
+            barrier = threading.Barrier(len(report_paths))
+            second_finished = threading.Event()
+
+            def load(path: Path):
+                barrier.wait(timeout=2)
+                if path == report_paths[0]:
+                    self.assertTrue(second_finished.wait(timeout=2))
+                else:
+                    second_finished.set()
+                return ({}, {}, [], []), [f"warning-{path.stem}"]
+
+            def result(engine_name: str, report_path: Path) -> EngineResult:
+                return EngineResult(
+                    engine_path=f"/{engine_name}",
+                    engine_name=engine_name,
+                    inp_path="model.inp",
+                    inp_name="model.inp",
+                    duration_s=1.0,
+                    peak_memory_mb=1.0,
+                    exit_code=0,
+                    rpt_path=str(report_path),
+                    stdout="",
+                    stderr="",
+                    error=None,
+                )
+
+            with (
+                patch(
+                    "swmm_bench.comparator._extract_report_tables_for_cache",
+                    side_effect=load,
+                ),
+                patch(
+                    "swmm_bench.comparator._parse_executor",
+                    side_effect=lambda max_workers, **_kwargs: ThreadPoolExecutor(
+                        max_workers
+                    ),
+                ),
+                warnings.catch_warnings(record=True) as caught,
+            ):
+                warnings.simplefilter("always")
+                comparisons = compare_all(
+                    [
+                        result(engine_name, report_path)
+                        for engine_name, report_path in zip(
+                            ("a", "b"), report_paths
+                        )
+                    ],
+                    parse_workers=2,
+                )
+
+        self.assertEqual(len(comparisons), 1)
+        self.assertEqual(
+            [str(item.message) for item in caught], ["warning-a", "warning-b"]
+        )
+
+    def test_compare_all_process_pool_round_trip(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            report_paths = [root / f"{name}.rpt" for name in ("a", "b")]
+            for report_path in report_paths:
+                _write_report(report_path, 1.0)
+
+            def result(engine_name: str, report_path: Path) -> EngineResult:
+                return EngineResult(
+                    engine_path=f"/{engine_name}",
+                    engine_name=engine_name,
+                    inp_path="model.inp",
+                    inp_name="model.inp",
+                    duration_s=1.0,
+                    peak_memory_mb=1.0,
+                    exit_code=0,
+                    rpt_path=str(report_path),
+                    stdout="",
+                    stderr="",
+                    error=None,
+                )
+
+            comparisons = compare_all(
+                [
+                    result(engine_name, report_path)
+                    for engine_name, report_path in zip(("a", "b"), report_paths)
+                ],
+                parse_workers=2,
+            )
+
+        self.assertEqual(len(comparisons), 1)
+        self.assertEqual(comparisons[0].overall_distance, 0.0)
 
     def test_compare_all_reports_pair_progress(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
