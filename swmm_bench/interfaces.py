@@ -265,6 +265,7 @@ def run_interface_suite(
     threads: int,
     parse_workers: int = 4,
     output_workers: int = 1,
+    report_target_mb: int = 100,
     platform: dict[str, Any],
     variable_step: float | None = None,
     progress_callback: Callable[[EngineResult], None] | None = None,
@@ -456,7 +457,9 @@ def run_interface_suite(
             comparison_results, parse_workers=parse_workers
         ),
         output_comparisons=compare_all_outputs(
-            comparison_results, parse_workers=output_workers
+            comparison_results,
+            parse_workers=output_workers,
+            report_size_mb=report_target_mb,
         ),
         interface_families=family_results,
     )

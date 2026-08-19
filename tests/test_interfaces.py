@@ -115,6 +115,8 @@ class InterfaceWorkflowTests(unittest.TestCase):
                     "routing",
                     "--variable-step",
                     "0.5",
+                    "--report-size-mb",
+                    "150",
                     "--name",
                     "interface-test",
                     "--output-dir",

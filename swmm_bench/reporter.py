@@ -24,7 +24,7 @@ from swmm_bench.models import (
 console = Console()
 
 _HTML_COMPARISON_DISTANCE_THRESHOLD = 0.01
-_HTML_GRAPHICAL_SERIES_LIMIT = 120
+_HTML_GRAPHICAL_SERIES_LIMIT = 5_000
 
 
 def _distance_style(distance: float) -> str:
@@ -273,6 +273,18 @@ def _below_threshold_reason(distance: float) -> str:
     )
 
 
+def _output_placeholder_reason(comparison: OutputComparison) -> str | None:
+    if (
+        comparison.overall_distance > _HTML_COMPARISON_DISTANCE_THRESHOLD
+        or comparison.graphical_series
+    ):
+        return None
+    unavailable_reason = comparison.graphical_unavailable_reason
+    if unavailable_reason and "overall distance did not exceed" not in unavailable_reason:
+        return None
+    return _below_threshold_reason(comparison.overall_distance)
+
+
 def _failed_placeholder(reason: str | None) -> bool:
     return bool(reason and "hidden as matching" not in reason)
 
@@ -471,11 +483,8 @@ def _build_template_context(result: BenchmarkResult) -> dict[str, Any]:
                 overall_distance=0.0,
                 section_comparisons=[],
             )
-        elif (
-            comparison.overall_distance <= _HTML_COMPARISON_DISTANCE_THRESHOLD
-            and not comparison.graphical_series
-        ):
-            placeholder_reason = _below_threshold_reason(comparison.overall_distance)
+        else:
+            placeholder_reason = _output_placeholder_reason(comparison)
         output_comparison_rows.append(
             {
                 "comparison": comparison,
@@ -488,12 +497,7 @@ def _build_template_context(result: BenchmarkResult) -> dict[str, Any]:
         key = _comparison_key(comparison)
         if key in seen_outputs:
             continue
-        placeholder_reason = (
-            _below_threshold_reason(comparison.overall_distance)
-            if comparison.overall_distance <= _HTML_COMPARISON_DISTANCE_THRESHOLD
-            and not comparison.graphical_series
-            else None
-        )
+        placeholder_reason = _output_placeholder_reason(comparison)
         output_comparison_rows.append(
             {
                 "comparison": comparison,
@@ -516,12 +520,13 @@ def _build_template_context(result: BenchmarkResult) -> dict[str, Any]:
             key=lambda item: item.distance,
             reverse=True,
         )
-        note = None
+        note = getattr(comparison, "graphical_unavailable_reason", None)
         if len(series) > _HTML_GRAPHICAL_SERIES_LIMIT:
-            note = (
+            truncation_note = (
                 f"Showing the {_HTML_GRAPHICAL_SERIES_LIMIT} highest-distance graph series "
                 "in HTML. The JSON results retain every series."
             )
+            note = f"{note} {truncation_note}" if note else truncation_note
             series = series[:_HTML_GRAPHICAL_SERIES_LIMIT]
         return [item.to_dict() for item in series], note
 

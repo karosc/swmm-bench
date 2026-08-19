@@ -99,6 +99,7 @@ def _execute_benchmark(
     threads: int,
     parse_workers: int,
     output_parse_workers: int,
+    report_size_mb: int,
     variable_step: float | None,
     json_out: Path | None,
     inp_names: dict[Path, str] | None = None,
@@ -228,6 +229,7 @@ def _execute_benchmark(
             engine_results,
             progress_callback=comparison_progress,
             parse_workers=output_parse_workers,
+            report_size_mb=report_size_mb,
         )
         if pair_total == 0:
             progress.update(
@@ -314,6 +316,12 @@ def run(
         min=1,
         help="Processes used to parse binary outputs; higher values use more memory.",
     ),
+    report_size_mb: int = typer.Option(
+        100,
+        "--report-size-mb",
+        min=1,
+        help="Approximate maximum HTML report size in MB.",
+    ),
     variable_step: float | None = typer.Option(
         None,
         "--variable-step",
@@ -353,6 +361,7 @@ def run(
             threads=threads,
             parse_workers=parse_workers,
             output_parse_workers=output_parse_workers,
+            report_size_mb=report_size_mb,
             variable_step=variable_step,
             html=html,
             json_out=json_out,
@@ -372,6 +381,7 @@ def run(
             threads=threads,
             parse_workers=parse_workers,
             output_parse_workers=output_parse_workers,
+            report_size_mb=report_size_mb,
             variable_step=variable_step,
             html=html,
             json_out=json_out,
@@ -456,6 +466,12 @@ def rebuild(
         "--output-parse-workers",
         min=1,
         help="Processes used to parse binary outputs; higher values use more memory.",
+    ),
+    report_size_mb: int = typer.Option(
+        100,
+        "--report-size-mb",
+        min=1,
+        help="Approximate eventual HTML report size in MB.",
     ),
 ) -> None:
     run_directory = run_directory.expanduser().resolve()
@@ -542,6 +558,7 @@ def rebuild(
                 progress_callback=comparison_progress,
                 include_all_comparisons=all_comparisons,
                 parse_workers=output_parse_workers,
+                report_size_mb=report_size_mb,
             )
             if pair_total == 0:
                 progress.update(
@@ -626,6 +643,12 @@ def run_suite(
         min=1,
         help="Processes used to parse binary outputs; higher values use more memory.",
     ),
+    report_size_mb: int = typer.Option(
+        100,
+        "--report-size-mb",
+        min=1,
+        help="Approximate maximum HTML report size in MB.",
+    ),
     variable_step: float | None = typer.Option(
         None,
         "--variable-step",
@@ -669,6 +692,7 @@ def run_suite(
             threads=threads,
             parse_workers=parse_workers,
             output_parse_workers=output_parse_workers,
+            report_size_mb=report_size_mb,
             variable_step=variable_step,
             html=html,
             json_out=json_out,
@@ -713,6 +737,12 @@ def run_interfaces(
         "--output-parse-workers",
         min=1,
         help="Processes used to parse binary outputs; higher values use more memory.",
+    ),
+    report_size_mb: int = typer.Option(
+        100,
+        "--report-size-mb",
+        min=1,
+        help="Approximate maximum HTML report size in MB.",
     ),
     variable_step: float | None = typer.Option(
         None,
@@ -773,6 +803,7 @@ def run_interfaces(
             threads=threads,
             parse_workers=parse_workers,
             output_workers=output_parse_workers,
+            report_target_mb=report_size_mb,
             variable_step=variable_step,
             platform=_platform_info(),
             progress_callback=lambda _result: progress.advance(task),

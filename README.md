@@ -65,6 +65,7 @@ uv run swmm-bench run /path/to/swmm-a /path/to/swmm-b \
   --threads 4 \
   --parse-workers 4 \
   --output-parse-workers 2 \
+  --report-size-mb 100 \
   --variable-step 0.5 \
   --timeout 600 \
   --output-dir results \
@@ -79,6 +80,7 @@ uv run swmm-bench run /path/to/swmm-a /path/to/swmm-b \
 | `--threads N` | Threads used by each engine run; defaults to `1`. |
 | `--parse-workers N` | Processes used to parse RPT files; defaults to `4`. |
 | `--output-parse-workers N` | Processes used to parse OUT files; defaults to `1` because each worker can consume substantial memory. |
+| `--report-size-mb N` | Approximate HTML report size target; defaults to `100`. Chart samples are retained for the highest-distance series within this budget. |
 | `--variable-step VALUE` | Override the model's `VARIABLE_STEP`; preserve it when omitted. |
 | `--timeout SECONDS` | Per-run timeout; defaults to `300`. |
 | `--output-dir PATH` | Results parent directory; defaults to `swmm-bench-results`. |
@@ -103,7 +105,7 @@ uv run swmm-test run /path/to/swmm-a /path/to/swmm-b \
   --model water-quality/waterquality-events_example.inp
 ```
 
-`swmm-test run` accepts `--threads`, `--parse-workers`, `--output-parse-workers`, `--variable-step`, `--timeout`, `--output-dir`, `--name`, `--html / --no-html`, and `--json-out`. Its default results parent is `swmm-test-results`.
+`swmm-test run` accepts `--threads`, `--parse-workers`, `--output-parse-workers`, `--report-size-mb`, `--variable-step`, `--timeout`, `--output-dir`, `--name`, `--html / --no-html`, and `--json-out`. Its default results parent is `swmm-test-results`.
 
 ### `swmm-test interface`
 
@@ -118,7 +120,7 @@ uv run swmm-test interface /path/to/source-swmm /path/to/target-swmm \
   --family rainfall --family hotstart
 ```
 
-The command accepts `--threads` and `--variable-step` overrides for every engine run, plus `--parse-workers` and `--output-parse-workers` for comparison parsing. It retains generated interfaces and records each path, size, and SHA-256 in `results.json`. A failed engine, missing interface, or empty interface produces a nonzero exit after reports are written.
+The command accepts `--threads` and `--variable-step` overrides for every engine run, plus `--parse-workers` and `--output-parse-workers` for comparison parsing and `--report-size-mb` for chart retention. It retains generated interfaces and records each path, size, and SHA-256 in `results.json`. A failed engine, missing interface, or empty interface produces a nonzero exit after reports are written.
 
 ### Rebuild or render reports
 
@@ -128,7 +130,7 @@ Recalculate report comparisons from retained run artifacts without executing SWM
 uv run swmm-bench rebuild swmm-bench-results/nightly
 ```
 
-Add `--outputs` to also recalculate binary-output comparisons and retain their chart data. Add `--all-comparisons` to retain and render chart data even when the overall distance is 1% or less. Rebuild also accepts `--parse-workers` and `--output-parse-workers`.
+Add `--outputs` to also recalculate binary-output comparisons and retain their chart data. Add `--all-comparisons` to retain and render chart data even when the overall distance is 1% or less. Rebuild also accepts `--parse-workers`, `--output-parse-workers`, and `--report-size-mb`.
 
 OUT parsing returns large DataFrames from each worker process. Increase `--output-parse-workers` only when enough RAM is available; `2` or `3` is a practical starting point for large artifacts.
 

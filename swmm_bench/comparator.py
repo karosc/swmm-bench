@@ -4,6 +4,7 @@ import dataclasses
 import dis
 import inspect
 import itertools
+import json
 import math
 import multiprocessing
 import numbers
@@ -31,8 +32,13 @@ from swmm.pandas import Report  # pyright: ignore[reportMissingImports]
 _MAX_RETAINED_DIFFERENCES = 100
 _MAX_GRAPH_POINTS_PER_SERIES = 120
 _MAX_GRAPH_POINTS_PER_COMPARISON = 12_000
+_MAX_GRAPHICAL_SERIES_PER_COMPARISON = 5_000
+_ESTIMATED_GRAPH_POINT_BYTES = 96
+_ESTIMATED_GRAPH_SERIES_BYTES = 256
 _GRAPHICAL_OUTPUT_DISTANCE_THRESHOLD = 0.01
 _MIN_GRAPH_POINTS_PER_SERIES = 3
+_BYTES_PER_MEBIBYTE = 1024 * 1024
+_MIN_REPORT_RESERVE_BYTES = 5 * _BYTES_PER_MEBIBYTE
 _DEFAULT_REPORT_PARSE_WORKERS = 4
 _DEFAULT_OUTPUT_PARSE_WORKERS = 1
 
@@ -44,6 +50,71 @@ def _parse_executor(max_workers: int, *, use_processes: bool) -> Executor:
             mp_context=multiprocessing.get_context("spawn"),
         )
     return ThreadPoolExecutor(max_workers=max_workers)
+
+
+def _report_graph_payload_budget(report_size_mb: int) -> int:
+    if report_size_mb < 1:
+        raise ValueError("report_size_mb must be at least 1")
+    target_bytes = report_size_mb * _BYTES_PER_MEBIBYTE
+    reserve_bytes = min(
+        target_bytes // 2,
+        max(_MIN_REPORT_RESERVE_BYTES, target_bytes // 10),
+    )
+    return target_bytes - reserve_bytes
+
+
+def _graphical_series_payload_bytes(
+    graphical_series: Sequence[OutputSeriesComparison],
+) -> int:
+    payload = [series.to_dict() for series in graphical_series]
+    return len(
+        json.dumps(
+            payload,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    )
+
+
+def _estimated_graph_payload_demand(frame_a: DataFrame, frame_b: DataFrame) -> int:
+    series_count = min(
+        len(_output_union_columns(frame_a, frame_b)),
+        _MAX_GRAPHICAL_SERIES_PER_COMPARISON,
+    )
+    if not series_count:
+        return 0
+    period_count = min(
+        max(len(frame_a.index.union(frame_b.index)), _MIN_GRAPH_POINTS_PER_SERIES),
+        _MAX_GRAPH_POINTS_PER_SERIES,
+    )
+    return series_count * (
+        _ESTIMATED_GRAPH_SERIES_BYTES
+        + period_count * _ESTIMATED_GRAPH_POINT_BYTES
+    )
+
+
+def _allocate_graph_payload_budgets(
+    pair_paths: Sequence[tuple[Path | None, Path | None]],
+    frames_by_path: Mapping[Path, DataFrame | None],
+    total_budget_bytes: int,
+) -> list[int]:
+    demands = []
+    for out_a, out_b in pair_paths:
+        frame_a = frames_by_path.get(out_a) if out_a is not None else None
+        frame_b = frames_by_path.get(out_b) if out_b is not None else None
+        demands.append(
+            _estimated_graph_payload_demand(frame_a, frame_b)
+            if frame_a is not None and frame_b is not None
+            else 0
+        )
+    total_demand = sum(demands)
+    if not total_demand:
+        return [0] * len(pair_paths)
+    return [
+        total_budget_bytes * demand // total_demand
+        for demand in demands
+    ]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -875,43 +946,90 @@ def _sample_output_positions(
 def _build_graphical_series(
     union_index: Any,
     sorted_columns: list[Any],
-    aligned_a: DataFrame,
-    aligned_b: DataFrame,
+    frame_a: DataFrame,
+    frame_b: DataFrame,
     section_comparisons: Sequence[OutputSectionComparison],
     *,
     inp_name: str,
     engine_a: str,
     engine_b: str,
+    payload_budget_bytes: int | None = None,
     progress_callback: ProgressCallback | None = None,
 ) -> tuple[list[OutputSeriesComparison], str | None]:
     series_count = len(sorted_columns)
     if not series_count:
         return [], None
-    if series_count * _MIN_GRAPH_POINTS_PER_SERIES > _MAX_GRAPH_POINTS_PER_COMPARISON:
-        return (
-            [],
-            f"Graphical data was not retained because {series_count:,} output series "
-            f"exceed the {_MAX_GRAPH_POINTS_PER_COMPARISON:,}-point chart payload budget.",
-        )
 
-    points_per_series = max(
-        _MIN_GRAPH_POINTS_PER_SERIES,
-        min(
-            _MAX_GRAPH_POINTS_PER_SERIES,
-            _MAX_GRAPH_POINTS_PER_COMPARISON // series_count,
-        ),
-    )
     sections_by_name = {
         section.section_name: section for section in section_comparisons
     }
-    graphical_series: list[OutputSeriesComparison] = []
+    if payload_budget_bytes is None:
+        if (
+            series_count * _MIN_GRAPH_POINTS_PER_SERIES
+            > _MAX_GRAPH_POINTS_PER_COMPARISON
+        ):
+            return (
+                [],
+                f"Graphical data was not retained because {series_count:,} output series "
+                f"exceed the {_MAX_GRAPH_POINTS_PER_COMPARISON:,}-point chart payload budget.",
+            )
+        candidate_columns = sorted_columns
+        points_per_series = max(
+            _MIN_GRAPH_POINTS_PER_SERIES,
+            min(
+                _MAX_GRAPH_POINTS_PER_SERIES,
+                _MAX_GRAPH_POINTS_PER_COMPARISON // series_count,
+            ),
+        )
+    else:
+        estimated_point_budget = payload_budget_bytes // _ESTIMATED_GRAPH_POINT_BYTES
+        candidate_count = min(
+            series_count,
+            _MAX_GRAPHICAL_SERIES_PER_COMPARISON,
+            estimated_point_budget // _MIN_GRAPH_POINTS_PER_SERIES,
+        )
+        if candidate_count < 1:
+            return (
+                [],
+                "Graphical data was not retained because the report-size target "
+                "left insufficient chart payload budget.",
+            )
+        candidate_columns = sorted(
+            sorted_columns,
+            key=lambda raw_column: (
+                -sections_by_name[
+                    output_series_name(_output_column(raw_column))
+                ].distance,
+                -sections_by_name[
+                    output_series_name(_output_column(raw_column))
+                ].difference_count,
+                output_series_name(_output_column(raw_column)),
+            ),
+        )[:candidate_count]
+        points_per_series = max(
+            _MIN_GRAPH_POINTS_PER_SERIES,
+            min(
+                _MAX_GRAPH_POINTS_PER_SERIES,
+                estimated_point_budget // candidate_count,
+            ),
+        )
 
-    for position, raw_column in enumerate(sorted_columns, start=1):
+    graphical_series: list[OutputSeriesComparison] = []
+    used_payload_bytes = 2  # Opening and closing brackets around the JSON list.
+    for position, raw_column in enumerate(candidate_columns, start=1):
         column = _output_column(raw_column)
         series_name = output_series_name(column)
         section = sections_by_name[series_name]
-        values_a = aligned_a.loc[:, raw_column].tolist()
-        values_b = aligned_b.loc[:, raw_column].tolist()
+        values_a = (
+            frame_a.loc[:, raw_column].reindex(union_index).tolist()
+            if raw_column in frame_a.columns
+            else [None] * len(union_index)
+        )
+        values_b = (
+            frame_b.loc[:, raw_column].reindex(union_index).tolist()
+            if raw_column in frame_b.columns
+            else [None] * len(union_index)
+        )
         numeric_a = [_chart_number(value) for value in values_a]
         numeric_b = [_chart_number(value) for value in values_b]
         positions = _sample_output_positions(
@@ -921,27 +1039,35 @@ def _build_graphical_series(
             numeric_a=numeric_a,
             numeric_b=numeric_b,
         )
-        graphical_series.append(
-            OutputSeriesComparison(
-                element_type=column[0],
-                element_name=column[1],
-                attribute=column[2],
-                distance=section.distance,
-                row_count_a=section.row_count_a,
-                row_count_b=section.row_count_b,
-                timestamps=[str(_json_value(union_index[item])) for item in positions],
-                values_a=[numeric_a[item] for item in positions],
-                values_b=[numeric_b[item] for item in positions],
-                source_point_count=len(union_index),
-                sampled=len(positions) < len(union_index),
-            )
+        candidate = OutputSeriesComparison(
+            element_type=column[0],
+            element_name=column[1],
+            attribute=column[2],
+            distance=section.distance,
+            row_count_a=section.row_count_a,
+            row_count_b=section.row_count_b,
+            timestamps=[str(_json_value(union_index[item])) for item in positions],
+            values_a=[numeric_a[item] for item in positions],
+            values_b=[numeric_b[item] for item in positions],
+            source_point_count=len(union_index),
+            sampled=len(positions) < len(union_index),
         )
+        candidate_bytes = _graphical_series_payload_bytes([candidate]) - 2
+        separator_bytes = 1 if graphical_series else 0
+        if (
+            payload_budget_bytes is not None
+            and used_payload_bytes + separator_bytes + candidate_bytes
+            > payload_budget_bytes
+        ):
+            break
+        graphical_series.append(candidate)
+        used_payload_bytes += separator_bytes + candidate_bytes
         if progress_callback is not None:
             progress_callback(
                 ComparisonProgress(
                     phase="output-graph",
                     completed=position,
-                    total=series_count,
+                    total=len(candidate_columns),
                     inp_name=inp_name,
                     engine_a=engine_a,
                     engine_b=engine_b,
@@ -949,6 +1075,19 @@ def _build_graphical_series(
                 )
             )
 
+    if not graphical_series:
+        return (
+            [],
+            "Graphical data was not retained because the report-size target "
+            "left insufficient chart payload budget.",
+        )
+    if len(graphical_series) < series_count:
+        return (
+            graphical_series,
+            f"Retained chart samples for {len(graphical_series):,} of "
+            f"{series_count:,} highest-distance output series within the "
+            "report-size target.",
+        )
     return graphical_series, None
 
 
@@ -964,6 +1103,7 @@ def _compare_output_frames(
     retain_tabular: bool = True,
     retain_graphical: bool = True,
     include_all_comparisons: bool = False,
+    graph_payload_budget_bytes: int | None = None,
 ) -> OutputComparison:
     union_columns = _output_union_columns(frame_a, frame_b)
     if not len(union_columns):
@@ -971,27 +1111,21 @@ def _compare_output_frames(
     timeline = _output_timeline(frame_a, frame_b)
     union_index = timeline.comparison_index
     sorted_columns = sorted(union_columns)
-    aligned_a = None
-    aligned_b = None
     timestamp_presence_a = union_index.isin(frame_a.index).tolist()
     timestamp_presence_b = union_index.isin(frame_b.index).tolist()
     table_comparisons: list[OutputSectionComparison] = []
 
     for position, raw_column in enumerate(sorted_columns, start=1):
-        if aligned_a is not None and aligned_b is not None:
-            values_a = aligned_a.loc[:, raw_column].tolist()
-            values_b = aligned_b.loc[:, raw_column].tolist()
-        else:
-            values_a = (
-                frame_a.loc[:, raw_column].reindex(union_index).tolist()
-                if raw_column in frame_a.columns
-                else [None] * len(union_index)
-            )
-            values_b = (
-                frame_b.loc[:, raw_column].reindex(union_index).tolist()
-                if raw_column in frame_b.columns
-                else [None] * len(union_index)
-            )
+        values_a = (
+            frame_a.loc[:, raw_column].reindex(union_index).tolist()
+            if raw_column in frame_a.columns
+            else [None] * len(union_index)
+        )
+        values_b = (
+            frame_b.loc[:, raw_column].reindex(union_index).tolist()
+            if raw_column in frame_b.columns
+            else [None] * len(union_index)
+        )
         prepared = _PreparedOutputSeries(
             values_a=values_a,
             values_b=values_b,
@@ -1032,28 +1166,18 @@ def _compare_output_frames(
         include_all_comparisons
         or overall_distance > _GRAPHICAL_OUTPUT_DISTANCE_THRESHOLD
     ):
-        if (
-            len(sorted_columns) * _MIN_GRAPH_POINTS_PER_SERIES
-            > _MAX_GRAPH_POINTS_PER_COMPARISON
-        ):
-            unavailable_reason = (
-                f"Graphical data was not retained because {len(sorted_columns):,} output series "
-                f"exceed the {_MAX_GRAPH_POINTS_PER_COMPARISON:,}-point chart payload budget."
-            )
-        else:
-            aligned_a = frame_a.reindex(index=union_index, columns=union_columns)
-            aligned_b = frame_b.reindex(index=union_index, columns=union_columns)
-            graphical_series, unavailable_reason = _build_graphical_series(
-                union_index,
-                sorted_columns,
-                aligned_a,
-                aligned_b,
-                table_comparisons,
-                inp_name=inp_name,
-                engine_a=engine_a,
-                engine_b=engine_b,
-                progress_callback=progress_callback,
-            )
+        graphical_series, unavailable_reason = _build_graphical_series(
+            union_index,
+            sorted_columns,
+            frame_a,
+            frame_b,
+            table_comparisons,
+            inp_name=inp_name,
+            engine_a=engine_a,
+            engine_b=engine_b,
+            payload_budget_bytes=graph_payload_budget_bytes,
+            progress_callback=progress_callback,
+        )
     elif retain_graphical:
         unavailable_reason = (
             f"Graphical data was not retained because the overall distance "
@@ -1205,6 +1329,7 @@ def compare_all_outputs(
     retain_graphical: bool = True,
     include_all_comparisons: bool = False,
     parse_workers: int = _DEFAULT_OUTPUT_PARSE_WORKERS,
+    report_size_mb: int = 100,
 ) -> list[OutputComparison]:
     comparisons: list[OutputComparison] = []
     grouped: dict[str, list[EngineResult]] = {}
@@ -1218,6 +1343,9 @@ def compare_all_outputs(
         for inp_path, results in grouped.items()
         for result_a, result_b in itertools.combinations(results, 2)
     ]
+    total_graph_payload_bytes = (
+        _report_graph_payload_budget(report_size_mb) if retain_graphical else 0
+    )
 
     def output_path(result: EngineResult) -> Path | None:
         if result.exit_code not in (0, None) or not result.out_path:
@@ -1282,8 +1410,17 @@ def compare_all_outputs(
                     )
                 )
 
-    for position, ((inp_path, result_a, result_b), (out_a, out_b)) in enumerate(
-        zip(pairs, pair_paths),
+    pair_graph_budgets = _allocate_graph_payload_budgets(
+        pair_paths,
+        frames_by_path,
+        total_graph_payload_bytes,
+    )
+    for position, (
+        (inp_path, result_a, result_b),
+        (out_a, out_b),
+        pair_graph_budget,
+    ) in enumerate(
+        zip(pairs, pair_paths, pair_graph_budgets),
         start=1,
     ):
         status: Literal["completed", "skipped"] = "skipped"
@@ -1307,20 +1444,20 @@ def compare_all_outputs(
             if frame_a is None or frame_b is None:
                 continue
             try:
-                comparisons.append(
-                    _compare_output_frames(
-                        frame_a,
-                        frame_b,
-                        result_a.engine_name,
-                        result_b.engine_name,
-                        inp_path,
-                        result_a.inp_name,
-                        progress_callback=progress_callback,
-                        retain_tabular=False,
-                        retain_graphical=retain_graphical,
-                        include_all_comparisons=include_all_comparisons,
-                    )
+                comparison = _compare_output_frames(
+                    frame_a,
+                    frame_b,
+                    result_a.engine_name,
+                    result_b.engine_name,
+                    inp_path,
+                    result_a.inp_name,
+                    progress_callback=progress_callback,
+                    retain_tabular=False,
+                    retain_graphical=retain_graphical,
+                    include_all_comparisons=include_all_comparisons,
+                    graph_payload_budget_bytes=pair_graph_budget,
                 )
+                comparisons.append(comparison)
                 status = "completed"
             except ValueError as exc:
                 warnings.warn(

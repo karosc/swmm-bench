@@ -1168,7 +1168,7 @@
               {% endif %}
               {% else %}
               <strong>Summary only</strong>
-              <p>Detailed output comparison data was not saved.</p>
+              <p>{{ item.graphical_unavailable_reason or "Detailed output comparison data was not saved." }}</p>
               {% endif %}
             </div>
             {% else %}

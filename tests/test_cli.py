@@ -46,6 +46,8 @@ class RegressionCliTests(unittest.TestCase):
                     "2",
                     "--output-parse-workers",
                     "3",
+                    "--report-size-mb",
+                    "150",
                 ],
             )
 
@@ -58,6 +60,7 @@ class RegressionCliTests(unittest.TestCase):
         self.assertEqual(
             execute_benchmark.call_args.kwargs["output_parse_workers"], 3
         )
+        self.assertEqual(execute_benchmark.call_args.kwargs["report_size_mb"], 150)
 
     def test_suite_run_records_stable_model_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -132,6 +135,8 @@ class BenchmarkCliTests(unittest.TestCase):
                         "3",
                         "--output-parse-workers",
                         "2",
+                        "--report-size-mb",
+                        "125",
                     ],
                 )
 
@@ -143,6 +148,9 @@ class BenchmarkCliTests(unittest.TestCase):
             self.assertEqual(execute_benchmark.call_args.kwargs["parse_workers"], 3)
             self.assertEqual(
                 execute_benchmark.call_args.kwargs["output_parse_workers"], 2
+            )
+            self.assertEqual(
+                execute_benchmark.call_args.kwargs["report_size_mb"], 125
             )
 
     def test_run_uses_bundled_benchmarks_when_inp_is_omitted(self) -> None:
@@ -242,6 +250,8 @@ class BenchmarkCliTests(unittest.TestCase):
                         str(run_directory),
                         "--outputs",
                         "--all-comparisons",
+                        "--report-size-mb",
+                        "175",
                     ],
                 )
 
@@ -262,6 +272,9 @@ class BenchmarkCliTests(unittest.TestCase):
             )
             self.assertTrue(
                 compare_outputs_mock.call_args.kwargs["include_all_comparisons"]
+            )
+            self.assertEqual(
+                compare_outputs_mock.call_args.kwargs["report_size_mb"], 175
             )
 
             report_html = root / "report.html"

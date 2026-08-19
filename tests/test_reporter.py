@@ -73,6 +73,40 @@ class ReporterTests(unittest.TestCase):
         self.assertNotIn("failed-fast", highlights)
         self.assertNotIn("failed-only.inp", highlights)
 
+    def test_summary_only_output_explains_chart_retention_reason(self) -> None:
+        result = BenchmarkResult(
+            schema_version="5",
+            name="chart-budget",
+            timestamp="2026-08-18T00:00:00+00:00",
+            platform={},
+            engine_results=[],
+            comparisons=[],
+            output_comparisons=[
+                OutputComparison(
+                    inp_path="model.inp",
+                    inp_name="model.inp",
+                    engine_a="a",
+                    engine_b="b",
+                    overall_distance=0.0,
+                    section_comparisons=[],
+                    details_retained=False,
+                    graphical_unavailable_reason=(
+                        "Graphical data was not retained because the report-size "
+                        "target left insufficient chart payload budget."
+                    ),
+                )
+            ],
+        )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output = Path(temporary_directory) / "report.html"
+            render_html(result, output)
+            html = output.read_text(encoding="utf-8")
+
+        self.assertIn("report-size target left insufficient", html)
+        self.assertNotIn("0.000000 hidden as matching", html)
+        self.assertNotIn("Detailed output comparison data was not saved.", html)
+
     def test_duration_label_tracks_schema_semantics(self) -> None:
         for schema_version, expected in (
             ("4", "Average runtime by engine"),

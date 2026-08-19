@@ -22,8 +22,11 @@ from swmm.pandas import example_out_path  # pyright: ignore[reportMissingImports
 
 from swmm_bench.comparator import (
     _MAX_GRAPH_POINTS_PER_SERIES,
+    _allocate_graph_payload_budgets,
     _cell_distance,
     _compare_output_frames,
+    _graphical_series_payload_bytes,
+    _report_graph_payload_budget,
     _sample_output_positions,
     compare_all_outputs,
     compare_outs,
@@ -33,6 +36,39 @@ from swmm_bench.output import extract_output_frame, extract_output_series
 
 
 class OutputExtractionTests(unittest.TestCase):
+    def test_report_size_reserves_space_for_non_graph_content(self) -> None:
+        self.assertEqual(_report_graph_payload_budget(100), 90 * 1024 * 1024)
+        self.assertEqual(_report_graph_payload_budget(1), 512 * 1024)
+        with self.assertRaisesRegex(ValueError, "at least 1"):
+            _report_graph_payload_budget(0)
+
+    def test_graph_budget_allocation_is_order_independent_and_skips_invalid_pairs(
+        self,
+    ) -> None:
+        index = date_range("2020-01-01", periods=3, freq="min")
+        small_columns = MultiIndex.from_tuples([("node", "N1", "depth")])
+        large_columns = MultiIndex.from_tuples(
+            [("node", f"N{position}", "depth") for position in range(4)]
+        )
+        small = DataFrame([[1.0]] * 3, index=index, columns=small_columns)
+        large = DataFrame([[1.0] * 4] * 3, index=index, columns=large_columns)
+        paths = [Path(f"{name}.out") for name in ("a", "b", "c", "d")]
+        frames = {paths[0]: small, paths[1]: small, paths[2]: large, paths[3]: large}
+        pair_paths = [(paths[0], paths[1]), (None, paths[3]), (paths[2], paths[3])]
+
+        budgets = _allocate_graph_payload_budgets(pair_paths, frames, 10_000)
+        reversed_budgets = _allocate_graph_payload_budgets(
+            list(reversed(pair_paths)), frames, 10_000
+        )
+        larger_budgets = _allocate_graph_payload_budgets(pair_paths, frames, 20_000)
+
+        self.assertEqual(budgets[1], 0)
+        self.assertGreater(budgets[2], budgets[0])
+        self.assertEqual(budgets, list(reversed(reversed_budgets)))
+        self.assertTrue(
+            all(larger >= smaller for smaller, larger in zip(budgets, larger_budgets))
+        )
+
     def test_package_fixture_extracts_a_semantic_wide_frame(self) -> None:
         preloaded = extract_output_frame(example_out_path)
         streamed = extract_output_frame(example_out_path, preload=False)
@@ -438,6 +474,44 @@ class OutputExtractionTests(unittest.TestCase):
             _MAX_GRAPH_POINTS_PER_SERIES,
         )
         self.assertTrue(comparison.graphical_series[0].sampled)
+
+    def test_report_size_budget_retains_highest_distance_series(self) -> None:
+        columns = MultiIndex.from_tuples(
+            [("node", f"N{index}", "depth") for index in range(5)],
+            names=["element_type", "element_name", "attribute"],
+        )
+        index = date_range("2020-01-01", periods=3, freq="min")
+        frame = DataFrame([[1.0] * 5] * 3, index=index, columns=columns)
+        compared = DataFrame(
+            [[1.0, 1.1, 2.0, 10.0, 100.0]] * 3,
+            index=index,
+            columns=columns,
+        )
+        payload_budget = 100_000
+
+        with patch("swmm_bench.comparator._MAX_GRAPHICAL_SERIES_PER_COMPARISON", 2):
+            comparison = _compare_output_frames(
+                frame,
+                compared,
+                "a",
+                "b",
+                "model.inp",
+                "model.inp",
+                graph_payload_budget_bytes=payload_budget,
+            )
+
+        self.assertEqual(
+            [series.element_name for series in comparison.graphical_series],
+            ["N4", "N3"],
+        )
+        self.assertLessEqual(
+            _graphical_series_payload_bytes(comparison.graphical_series),
+            payload_budget,
+        )
+        self.assertIn(
+            "2 of 5 highest-distance output series",
+            comparison.graphical_unavailable_reason or "",
+        )
 
     def test_graphical_payload_is_omitted_when_series_exceed_point_budget(self) -> None:
         columns = MultiIndex.from_tuples(
