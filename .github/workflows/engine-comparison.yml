@@ -170,6 +170,7 @@ jobs:
           --variable-step 0 \
           --timeout 900 \
           --output-parse-workers 2 \
+          --report-size-mb 200 \
           --name "${{ inputs.run_name }}" \
           build/epa-swmm/src/run/epaswmm \
           build/openswmm/src/cli/openswmm \
@@ -184,6 +185,7 @@ jobs:
           --variable-step 0 \
           --timeout 1800 \
           --output-parse-workers 2 \
+          --report-size-mb 200 \
           --name "${{ inputs.run_name }}" \
           build/epa-swmm/src/run/epaswmm \
           build/openswmm/src/cli/openswmm \
